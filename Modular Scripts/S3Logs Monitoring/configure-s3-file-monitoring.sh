@@ -297,7 +297,6 @@ installCronToSyncS3BucketPeriodically()
 			break;;
 			[Nn]* ) 
 			logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
-			exit 1
 			break;;
 			* ) echo "Please answer yes or no.";;
 		esac
