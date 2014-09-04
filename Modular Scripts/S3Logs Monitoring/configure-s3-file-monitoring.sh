@@ -8,7 +8,7 @@ source configure-file-monitoring.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-s3-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.2
 
 #s3 bucket name to configure
 LOGGLY_S3_BUCKET_NAME=
@@ -67,15 +67,16 @@ installLogglyConfForS3()
 	#invoke file monitoring on each file after checking if it is a text file or not
 	invokeS3FileMonitoring
 	
+	#install a cron job to sync the downloaded files after each 5 minutes 
+	installCronToSyncS3BucketPeriodically
+	
 	if [ "$IS_ANY_FILE_CONFIGURED" != "false" ]; then
 		#check if s3 logs made it to loggly
 		checkIfS3LogsMadeToLoggly
 	else
 		logMsgToConfigSysLog "WARN" "WARN: Did not find any files to configure. Nothing to do."
 	fi
-	
-	#delete temporary directory
-	#deleteTempDir
+
 }
 
 
@@ -95,6 +96,9 @@ removeLogglyConfForS3()
 
 	#remove file monitoring
 	removeS3FileMonitoring
+        
+	#delete the s3 sync cron from the crontab
+	deleteS3CronFromCrontab
 
 	#delete temporary directory if exists
 	TEMP_DIR=/tmp/$LOGGLY_S3_ALIAS
@@ -274,6 +278,33 @@ invokeS3FileMonitoring()
 	fi
 }
 
+installCronToSyncS3BucketPeriodically()
+{
+	while true; do
+		read -p "Would you like install a Cron job to sync the downloaded files with the bucket? (yes/no)" yn
+		case $yn in
+			[Yy]* )
+			logMsgToConfigSysLog "INFO" "INFO: Creating a Cron job to sync $LOGGLY_S3_BUCKET_NAME files to /tmp/$LOGGLY_S3_ALIAS in every five minutes."
+			CRON_FILE="/tmp/$LOGGLY_S3_ALIAS.txt"
+
+			#setting up cron job
+			CRON_JOB_TO_SYNC_S3_BUCKET="*/5 * * * * s3cmd sync $LOGGLY_S3_BUCKET_NAME --preserve /tmp/$LOGGLY_S3_ALIAS"
+			EXISTING_CRONS=$(sudo crontab -l)
+			echo "$EXISTING_CRONS" >> $CRON_FILE
+			echo "$CRON_JOB_TO_SYNC_S3_BUCKET" >> $CRON_FILE
+			sudo crontab $CRON_FILE
+			sudo rm -fr $CRON_FILE
+			break;;
+			[Nn]* ) 
+			logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
+			exit 1
+			break;;
+			* ) echo "Please answer yes or no.";;
+		esac
+	done
+	
+}
+
 deleteTempDir()
 {	
 	if [ -d "$TEMP_DIR" ]; then
@@ -345,6 +376,12 @@ removeS3FileMonitoring()
 	done
 	echo "INFO: Removed all the modified files."
 	restartRsyslog
+}
+
+deleteS3CronFromCrontab()
+{
+	logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
+	sudo crontab -l | grep -v  "/tmp/$LOGGLY_S3_ALIAS" | crontab -
 }
 
 #display usage syntax
