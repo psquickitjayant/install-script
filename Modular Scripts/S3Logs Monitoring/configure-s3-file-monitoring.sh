@@ -281,22 +281,44 @@ invokeS3FileMonitoring()
 installCronToSyncS3BucketPeriodically()
 {
 	while true; do
-		read -p "Would you like install a Cron job to sync the downloaded files with the bucket? (yes/no)" yn
+		read -p "Would you like install a Cron job to sync the files currently in your bucket every 5 minutes? (yes/no)" yn
 		case $yn in
 			[Yy]* )
-			logMsgToConfigSysLog "INFO" "INFO: Creating a Cron job to sync $LOGGLY_S3_BUCKET_NAME files to /tmp/$LOGGLY_S3_ALIAS in every five minutes."
-			CRON_FILE="/tmp/$LOGGLY_S3_ALIAS.txt"
-
-			#setting up cron job
-			CRON_JOB_TO_SYNC_S3_BUCKET="*/5 * * * * s3cmd sync $LOGGLY_S3_BUCKET_NAME --preserve /tmp/$LOGGLY_S3_ALIAS"
-			EXISTING_CRONS=$(sudo crontab -l)
-			echo "$EXISTING_CRONS" >> $CRON_FILE
-			echo "$CRON_JOB_TO_SYNC_S3_BUCKET" >> $CRON_FILE
-			sudo crontab $CRON_FILE
-			sudo rm -fr $CRON_FILE
-			break;;
+				CRON_FILE="/tmp/cron_$LOGGLY_S3_ALIAS"
+				CRON_SYNC_PATH="/tmp/$LOGGLY_S3_ALIAS"
+				
+				#checking if the provided s3 path if of directory or file
+				IS_DIR="true"
+				BUCKET_URL_LAST_VALUE=$(echo ${LOGGLY_S3_BUCKET_NAME##*/})
+				
+				if [ "$BUCKET_URL_LAST_VALUE" != "" ]; then
+					for fle in $(find $CRON_SYNC_PATH -name $BUCKET_URL_LAST_VALUE)
+					do
+						if [ -f $fle ]; then
+							IS_DIR="false"
+							break
+						fi
+					done
+				fi
+				
+				#adding file name to the sync folder as the bucket path is
+				#provided upto a file
+				if [ "$IS_DIR" == "false" ]; then
+					CRON_SYNC_PATH="$CRON_SYNC_PATH/$BUCKET_URL_LAST_VALUE"
+				fi
+				
+				logMsgToConfigSysLog "INFO" "INFO: Creating a Cron job to sync $LOGGLY_S3_BUCKET_NAME files to $CRON_SYNC_PATH in every five minutes."
+				
+				#setting up cron job
+				CRON_JOB_TO_SYNC_S3_BUCKET="*/5 * * * * s3cmd sync $LOGGLY_S3_BUCKET_NAME --preserve $CRON_SYNC_PATH"
+				EXISTING_CRONS=$(sudo crontab -l)
+				echo "$EXISTING_CRONS" >> $CRON_FILE
+				echo "$CRON_JOB_TO_SYNC_S3_BUCKET" >> $CRON_FILE
+				sudo crontab $CRON_FILE
+				sudo rm -fr $CRON_FILE
+				break;;
 			[Nn]* ) 
-			logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
+				logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
 			break;;
 			* ) echo "Please answer yes or no.";;
 		esac
