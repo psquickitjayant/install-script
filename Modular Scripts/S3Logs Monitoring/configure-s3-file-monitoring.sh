@@ -8,7 +8,7 @@ source configure-file-monitoring.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-s3-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.2
+SCRIPT_VERSION=1.3
 
 #s3 bucket name to configure
 LOGGLY_S3_BUCKET_NAME=
@@ -101,7 +101,7 @@ removeLogglyConfForS3()
 	deleteS3CronFromCrontab
 
 	#delete temporary directory if exists
-	TEMP_DIR=/tmp/$LOGGLY_S3_ALIAS
+	TEMP_DIR=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
 	deleteTempDir
 	
 	#log success message
@@ -207,7 +207,7 @@ checkIfValidS3Bucket()
 
 createTempDir()
 {
-	TEMP_DIR=/tmp/$LOGGLY_S3_ALIAS
+	TEMP_DIR=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
 	if [ -d "$TEMP_DIR" ]; then
 		if [ "$(ls -A $TEMP_DIR)" ]; then
 			logMsgToConfigSysLog "WARN" "WARN: There are some files/folders already present in $TEMP_DIR. If you continue, the files currently inside the $TEMP_DIR will also be configured to send logs to loggly."
@@ -225,7 +225,12 @@ createTempDir()
 			done
 		fi		
 	else
-		mkdir /tmp/$LOGGLY_S3_ALIAS
+		if [ -d "/tmp/s3monitoring" ]; then
+			mkdir /tmp/s3monitoring/$LOGGLY_S3_ALIAS
+		else
+			mkdir /tmp/s3monitoring
+			mkdir /tmp/s3monitoring/$LOGGLY_S3_ALIAS
+		fi
 	fi
 }
 
@@ -246,7 +251,7 @@ downloadS3Bucket()
 
 invokeS3FileMonitoring()
 {
-	dir=/tmp/$LOGGLY_S3_ALIAS
+	dir=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
 	#TODO: Not supporting multiple files with same name in different directories
 	#only supporting file with naming convention *.*
 	for f in $(find $dir -name '*')
@@ -284,8 +289,8 @@ installCronToSyncS3BucketPeriodically()
 		read -p "Would you like install a Cron job to sync the files currently in your bucket every 5 minutes? (yes/no)" yn
 		case $yn in
 			[Yy]* )
-				CRON_FILE="/tmp/cron_$LOGGLY_S3_ALIAS"
-				CRON_SYNC_PATH="/tmp/$LOGGLY_S3_ALIAS"
+				CRON_FILE="/tmp/s3monitoring/cron_$LOGGLY_S3_ALIAS"
+				CRON_SYNC_PATH="/tmp/s3monitoring/$LOGGLY_S3_ALIAS"
 				
 				#checking if the provided s3 path if of directory or file
 				IS_DIR="true"
@@ -311,15 +316,23 @@ installCronToSyncS3BucketPeriodically()
 				
 				#setting up cron job
 				CRON_JOB_TO_SYNC_S3_BUCKET="*/5 * * * * s3cmd sync $LOGGLY_S3_BUCKET_NAME --preserve $CRON_SYNC_PATH"
-				EXISTING_CRONS=$(sudo crontab -l)
-				echo "$EXISTING_CRONS" >> $CRON_FILE
+				
+				EXISTING_CRONS=$(sudo crontab -l 2>&1)
+				case $EXISTING_CRONS in
+					no*)
+						;;
+					*)
+						echo "$EXISTING_CRONS" >> $CRON_FILE
+						;;
+				esac
+				
 				echo "$CRON_JOB_TO_SYNC_S3_BUCKET" >> $CRON_FILE
 				sudo crontab $CRON_FILE
 				sudo rm -fr $CRON_FILE
 				break;;
 			[Nn]* ) 
 				logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
-			break;;
+				break;;
 			* ) echo "Please answer yes or no.";;
 		esac
 	done
@@ -402,7 +415,7 @@ removeS3FileMonitoring()
 deleteS3CronFromCrontab()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
-	sudo crontab -l | grep -v  "/tmp/$LOGGLY_S3_ALIAS" | crontab -
+	sudo crontab -l | grep -v  "/tmp/s3monitoring/$LOGGLY_S3_ALIAS" | crontab -
 }
 
 #display usage syntax
