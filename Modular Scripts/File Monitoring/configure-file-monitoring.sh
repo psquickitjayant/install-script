@@ -259,7 +259,7 @@ checkIfFileLogsMadeToLoggly()
 		searchAndFetch fileLatestLogCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Logs did not make to Loggly in time. Please check your token & network/firewall settings and retry."
+			logMsgToConfigSysLog "ERROR" "ERROR: File logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done

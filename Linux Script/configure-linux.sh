@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.5
+SCRIPT_VERSION=1.6
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -269,7 +269,7 @@ checkIfLogglyServersAccessible()
 	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable."
 	else
-		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
+		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings."
 		exit 1
 	fi
 
@@ -277,7 +277,7 @@ checkIfLogglyServersAccessible()
 	if [ $(curl --connect-timeout 10 $LOGS_01_HOST:$LOGGLY_SYSLOG_PORT 2>&1 | grep "Empty reply from server" | wc -l) == 1 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port."
 	else
-		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable via $LOGGLY_SYSLOG_PORT port. Please check your network and firewall settings. Continuing to configure Loggly on your system."
+		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable via $LOGGLY_SYSLOG_PORT port. Please check your network and firewall settings."
 		exit 1
 	fi
 
@@ -506,7 +506,7 @@ checkIfLogsMadeToLoggly()
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
 			MANUAL_CONFIG_INSTRUCTION=$MANUAL_CONFIG_INSTRUCTION" Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
-			logMsgToConfigSysLog "ERROR" "ERROR: Verification logs did not make it to Loggly in time. Please check your token & network/firewall settings and retry."
+			logMsgToConfigSysLog "ERROR" "ERROR: Logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done
@@ -601,9 +601,9 @@ logMsgToConfigSysLog()
 sendPayloadToConfigSysLog()
 {
 	if [ "$APP_TAG" = "" ]; then
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
 	else
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
 	fi
 	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$3 > /dev/null 2>&1
 }
