@@ -169,8 +169,8 @@ downloadS3cmd()
 #configure s3cmd
 configureS3cmd()
 {
-	s3cmd --configure
-	IS_S3CMD_CONFIGURED_BY_SCRIPT="true"
+	sudo s3cmd --configure
+	IS_S3CMD_CONFIGURED_BY_SCRIPT="true"	
 	#check if s3cmd configured successfully now
 	checkIfS3cmdConfigured
 }
@@ -240,7 +240,7 @@ downloadS3Bucket()
 		#Files are downloaded in nested directory
 		cd $TEMP_DIR
 		echo "Downloading files, may take some time..."
-		s3cmd get -r -f $LOGGLY_S3_BUCKET_NAME > /dev/null 2>&1
+		sudo s3cmd get -r -f $LOGGLY_S3_BUCKET_NAME > /dev/null 2>&1
 		if [ $? -ne 0 ]; then
 			logMsgToConfigSysLog "ERROR" "ERROR: Error downloading files recursively from $LOGGLY_S3_BUCKET_NAME"
 			exit 1
@@ -269,6 +269,7 @@ invokeS3FileMonitoring()
 			LOGGLY_FILE_TAG="s3file"
 			CONF_FILE_FORMAT_NAME="LogglyFormatS3"
 			constructFileVariables
+			checkFileReadPermission
 			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 			write21ConfFileContents
 			IS_ANY_FILE_CONFIGURED="true"
@@ -289,6 +290,12 @@ installCronToSyncS3BucketPeriodically()
 		read -p "Would you like install a Cron job to sync the files currently in your bucket every 5 minutes? (yes/no)" yn
 		case $yn in
 			[Yy]* )
+			
+				#copying .s3cfg file to /root so that it can be used by crontab for sync
+				if ! sudo test -f "/root/.s3cfg" ; then
+					sudo cp $HOME/.s3cfg /root
+				fi
+			
 				CRON_FILE="/tmp/s3monitoring/cron_$LOGGLY_S3_ALIAS"
 				CRON_SYNC_PATH="/tmp/s3monitoring/$LOGGLY_S3_ALIAS"
 				
