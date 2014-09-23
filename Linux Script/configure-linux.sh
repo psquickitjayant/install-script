@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.6
+SCRIPT_VERSION=1.7
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -145,10 +145,9 @@ installLogglyConf()
 	if [ "$LINUX_DO_VERIFICATION" = "true" ]; then
 		#check if the logs are going to loggly fro linux system now
 		checkIfLogsMadeToLoggly
-
-		#log success message
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
 	fi
+
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
 }
 
 #remove loggly configuration from Linux system
@@ -401,22 +400,8 @@ write22LogglyConfFile()
 {
 	echo "INFO: Checking if loggly sysconf file $LOGGLY_RSYSLOG_CONFFILE exist."
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
-				checkAuthTokenAndWriteContents;
-				break;;
-				[Nn]* )
-				LINUX_DO_VERIFICATION="false"
-				logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
+		checkIfConfigurationChanged
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE does not exist, creating file $LOGGLY_RSYSLOG_CONFFILE"
 		checkAuthTokenAndWriteContents
@@ -433,6 +418,48 @@ checkAuthTokenAndWriteContents()
 		logMsgToConfigSysLog "ERROR" "ERROR: Loggly auth token is required to configure rsyslog. Please pass -a <auth token> while running script."
 		exit 1
 	fi
+}
+
+#matches if the content of 22-loggly.conf content is changed
+checkIfConfigurationChanged()
+{
+	ASK_FOR_VERIFICATION="false"
+	
+	#strings to be checked which should be present in the existing 22-loggly.conf. 
+	#If these strings are not same then a warning message will be shown to user to update the 22-loggly.conf file
+	STR_TO_BE_CHECKED[0]="\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID] %msg%\""
+	STR_TO_BE_CHECKED[1]="*.*             @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat"
+
+	for i in "${STR_TO_BE_CHECKED[@]}"
+	do
+		if ! sudo grep -Fxq "$i" $LOGGLY_RSYSLOG_CONFFILE; then
+			ASK_FOR_VERIFICATION="true"
+			break;
+		fi
+	done
+	
+	if [ "$ASK_FOR_VERIFICATION" == "true" ]; then
+		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE content is outdated."
+		while true; 
+		do
+			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
+				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
+				checkAuthTokenAndWriteContents;
+				break;;
+				[Nn]* )
+				LINUX_DO_VERIFICATION="false"
+				logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
+				break;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
+	else
+		LINUX_DO_VERIFICATION="false"
+	fi
+	
 }
 
 #write the contents to 22-loggly.conf file
