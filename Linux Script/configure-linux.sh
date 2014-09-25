@@ -147,7 +147,10 @@ installLogglyConf()
 		checkIfLogsMadeToLoggly
 	fi
 
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
+	if [ "$IS_INVOKED" = "" ]; then
+		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
+	fi
+	
 }
 
 #remove loggly configuration from Linux system
@@ -439,7 +442,7 @@ checkIfConfigurationChanged()
 	done
 	
 	if [ "$ASK_FOR_VERIFICATION" == "true" ]; then
-		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE content is outdated."
+		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE content is incorrect."
 		while true; 
 		do
 			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
