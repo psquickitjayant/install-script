@@ -276,7 +276,7 @@ checkIfNginxLogsMadeToLoggly()
 checkIfLogsAreParsedInLoggly()
 {
 	nginxInitialLogCount=0
-	queryParam="tag%3Anginx&logtype%3Anginx&from=-15m&until=now&size=1"
+	queryParam="tag%3Anginx%20logtype%3Anginx&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	searchAndFetch nginxInitialLogCount "$queryUrl"
 	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Nginx logs are parsed in Loggly."
