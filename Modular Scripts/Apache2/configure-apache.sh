@@ -311,7 +311,7 @@ checkIfApacheLogsMadeToLoggly()
 checkIfLogsAreParsedInLoggly()
 {
 	apacheInitialLogCount=0
-	queryParam="tag%3Aapache&logtype%3Aapache&from=-15m&until=now&size=1"
+	queryParam="tag%3Aapache%20logtype%3Aapache&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	searchAndFetch apacheInitialLogCount "$queryUrl"
 	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Apache logs are parsed in Loggly."
