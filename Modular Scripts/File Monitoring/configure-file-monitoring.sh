@@ -2,20 +2,21 @@
 
 #downloads configure-linux.sh
 echo "INFO: Downloading dependencies - configure-linux.sh"
-curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/script-dev/Linux%20Script/configure-linux.sh
+curl -s -o configure-linux.sh https://www.loggly.com/install/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.10
+SCRIPT_VERSION=1.11
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
 
 #alias name, will be used as tag & state file name etc. provided by user
 LOGGLY_FILE_TO_MONITOR_ALIAS=
+FILE_ALIAS=
 
 #file alias provided by the user
 APP_TAG="\"file-alias\":\"\""
@@ -40,6 +41,11 @@ CONF_FILE_FORMAT_NAME="LogglyFormatFile"
 #add tags to the logs
 TAG=
 
+FILE_TO_MONITOR=
+
+IS_DIRECTORY=
+
+IS_WILDCARD=
 ##########  Variable Declarations - End  ##########
 
 # executing the script for loggly to install and configure syslog
@@ -53,36 +59,45 @@ installLogglyConfForFile()
 
 	#checks if the file name contain spaces, if yes, the exit
 	checkIfFileLocationContainSpaces
-
-	#construct variables using filename and filealias
-	constructFileVariables
-
-	#check if file to monitor exists
-	checkIfFileExist
-
-	#checks if the file has proper read permission
-	checkFileReadPermission
 	
 	#check if the alias is already taken
 	checkIfFileAliasExist
-
-	#configure loggly for Linux
-	installLogglyConf
 	
-	#multiple tags
-	addTagsInConfiguration
+	if [ "$IS_DIRECTORY" == "true" ]; then
+		
+		configureDirectoryFileMonitoring
 	
-	#create 21<file alias>.conf file
-	write21ConfFileContents
-
+	else
+				
+		#check if file to monitor exists
+		checkIfFileExist
+		
+		#construct variables using filename and filealias
+		constructFileVariables
+		
+		#check for the log file size
+		checkLogFileSize $LOGGLY_FILE_TO_MONITOR
+		
+		#checks if the file has proper read permission
+		checkFileReadPermission
+		
+		#configure loggly for Linux
+		installLogglyConf
+		
+		#multiple tags
+		addTagsInConfiguration
+		
+		#create 21<file alias>.conf file
+		write21ConfFileContents
+		
+	fi
+	
 	#restart rsyslog
 	restartRsyslog
-	
-	#check for the log file size
-	checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 
 	#verify if the file logs made it to loggly
 	checkIfFileLogsMadeToLoggly
+	
 	
 	if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "false" ]; then
 			#log success message
@@ -137,6 +152,92 @@ constructFileVariables()
 
 	#application tag
 	APP_TAG="\"file-alias\":\"$LOGGLY_FILE_TO_MONITOR_ALIAS\""
+}
+
+#configures the directory files for file monitoring
+configureDirectoryFileMonitoring()
+{
+	addTagsInConfiguration
+	TOTAL_FILES_IN_DIR=$(ls -1 ${LOGGLY_FILE_TO_MONITOR} | wc -l)
+	logMsgToConfigSysLog "INFO" "INFO: There are $TOTAL_FILES_IN_DIR files in directory. Configuring each file for monitoring present in this directory."
+	if [ "$SUPPRESS_PROMPT" == "false" ]; then
+	while true; do
+		read -p "There are $TOTAL_FILES_IN_DIR files present in this directory. Would you like to configure all the files (yes/no)?" yn
+		case $yn in
+			[Yy]* )
+				for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
+				do
+					configureFilesPresentInDirectory $file $FILE_ALIAS
+				done
+				break;;
+			[Nn]* )
+				exit 1
+				break;;
+			* ) echo "Please answer yes or no.";;
+			esac
+		done
+		while true; do
+			read -p "Would you like install a Cron job to sync the files currently in your Directory every 5 minutes? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+					doCronInstallation
+					break;;
+				[Nn]* ) 
+					logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
+					break;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
+	else
+		for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
+		do
+			configureFilesPresentInDirectory $file $FILE_ALIAS
+			doCronInstallation
+		done		
+	fi
+}
+
+#actually configures a file present in the directory for monitoring
+configureFilesPresentInDirectory()
+{
+	if [ "$IS_WILDCARD" == "true" ]; then
+		FILE_TO_MONITOR=$1
+	else
+		FILE_TO_MONITOR=$LOGGLY_FILE_TO_MONITOR/$1
+	fi
+	fileNameWithExt=${1##*/}
+	uniqueFileName=$(echo "$fileNameWithExt" | tr . _)
+	var=$(file $FILE_TO_MONITOR)
+
+	#it may be possible that the "text" may contain some uppercase letters like "Text"
+	var=$(echo $var | tr "[:upper:]" "[:lower:]")
+	
+	if [[ $var == *text* ]]; then
+		LOGGLY_FILE_TO_MONITOR_ALIAS=$uniqueFileName-$2
+		
+		if [ -f ${FILE_TO_MONITOR} ]; then
+			constructFileVariables
+			checkFileReadPermission
+			checkLogFileSize $FILE_TO_MONITOR
+			installLogglyConf
+			write21ConfFileContents
+		fi
+	fi
+}
+
+checkIfWildcardExist()
+{
+	TOTAL_FILES_IN_DIR=$(ls -1 ${LOGGLY_FILE_TO_MONITOR} 2> /dev/null | wc -l )
+	WILDCARDS=( '*' '.' '?' '|' ']' '[' )
+	for WILDCARD in "${WILDCARDS[@]}";
+	do
+		if [[ $LOGGLY_FILE_TO_MONITOR == *"${WILDCARD}"* && $TOTAL_FILES_IN_DIR -gt 0 ]]; then
+			IS_WILDCARD="true"
+			return 0
+		else
+			return 1
+		fi
+	done
 }
 
 #checks if the file to be monitored exist
@@ -224,8 +325,7 @@ checkLogFileSize()
 
 #checks the input file has proper read permissions 
 checkFileReadPermission()
-{
-	
+{	
 	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
 	#no need to check read permissions with RedHat and CentOS as they also work with ---------- (000)permissions
 	case "$LINUX_DIST_IN_LOWER_CASE" in
@@ -242,9 +342,7 @@ checkFileReadPermission()
 			fi
 		;;
 	esac
-	
 }
-
 
 addTagsInConfiguration()
 {
@@ -254,6 +352,56 @@ addTagsInConfiguration()
 	do
 		TAG="$TAG tag=\\\"$i\\\" "
 	done
+}
+
+
+doCronInstallation()
+{	
+	CRON_SCRIPT="/tmp/21-filemonitoring-cron-$FILE_ALIAS.sh"
+	logMsgToConfigSysLog "INFO" "INFO: Creating cron script $CRON_SCRIPT"
+
+sudo touch $CRON_SCRIPT
+sudo chmod +x $CRON_SCRIPT
+
+cronScriptStr="#!/bin/bash
+curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
+
+FILE_TO_MONITOR=
+for file in \$(find ${LOGGLY_FILE_TO_MONITOR} -mmin -\$((60*24)) )
+do
+	FILE_TO_MONITOR=\$file
+	fileNameWithExt=\${file##*/}
+	uniqueFileName=$(echo "\$fileNameWithExt" | tr . _)
+	var1=\$(file \$FILE_TO_MONITOR)
+	var1=\$(echo \$var1 | tr "[:upper:]" "[:lower:]")
+	if [[ \$var1 == *text* ]]; then
+		LOGGLY_FILE_TO_MONITOR_ALIAS=\$uniqueFileName-$FILE_ALIAS
+		if [ -f \${FILE_TO_MONITOR} ]; then
+			sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f \$FILE_TO_MONITOR -l \$LOGGLY_FILE_TO_MONITOR_ALIAS -tag $LOGGLY_FILE_TAG -s
+		fi
+	fi
+done
+"
+	#write to cron script file
+sudo cat << EOIPFW >> $CRON_SCRIPT
+$cronScriptStr
+EOIPFW
+
+	CRON_JOB_TO_MONITOR_FILES="*/5 * * * * sudo bash $CRON_SCRIPT"
+	CRON_FILE="/tmp/File_Monitor_Cron"
+
+	EXISTING_CRONS=$(sudo crontab -l 2>&1)
+	case $EXISTING_CRONS in
+		no*)
+		;;
+		*)
+		echo "$EXISTING_CRONS" >> $CRON_FILE
+		;;
+	esac
+	
+	echo "$CRON_JOB_TO_MONITOR_FILES" >> $CRON_FILE
+	sudo crontab $CRON_FILE
+	sudo rm -fr $CRON_FILE	
 }
 
 #function to write the contents of syslog config file
@@ -274,7 +422,7 @@ write21ConfFileContents()
 	
 	imfileStr+="
 	# File access file:
-	\$InputFileName $LOGGLY_FILE_TO_MONITOR
+	\$InputFileName $FILE_TO_MONITOR
 	\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS:
 	\$InputFileStateFile stat-$LOGGLY_FILE_TO_MONITOR_ALIAS
 	\$InputFileSeverity info
@@ -332,7 +480,7 @@ checkIfFileLogsMadeToLoggly()
 	done
 
 	if [ "$fileLatestLogCount" -gt "$fileInitialLogCount" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Logs successfully transferred to Loggly! You are now sending $LOGGLY_FILE_TO_MONITOR logs to Loggly."
+		logMsgToConfigSysLog "INFO" "INFO: Logs successfully transferred to Loggly! You are now sending $FILE_TO_MONITOR logs to Loggly."
 		checkIfLogsAreParsedInLoggly
 	fi
 }
@@ -416,12 +564,26 @@ if [ "$1" != "being-invoked" ]; then
 			  LOGGLY_ROLLBACK="true"
 			  ;;
 		  -f | --filename ) shift
-			  #LOGGLY_FILE_TO_MONITOR=$1
 			  LOGGLY_FILE_TO_MONITOR=$(readlink -f "$1")
-			  echo "File to monitor: $LOGGLY_FILE_TO_MONITOR"
+			  if [ -f "$LOGGLY_FILE_TO_MONITOR" ];then
+				
+				FILE_TO_MONITOR=$LOGGLY_FILE_TO_MONITOR
+				echo "File to monitor: $LOGGLY_FILE_TO_MONITOR"
+			  
+			  elif [ -d "$LOGGLY_FILE_TO_MONITOR" ] || checkIfWildcardExist ; then
+				
+				IS_DIRECTORY="true"
+				echo "Directory to monitor: $LOGGLY_FILE_TO_MONITOR"
+				
+			  else
+				echo "ERROR: Cannot access $LOGGLY_FILE_TO_MONITOR: No such file or directory"
+				exit 1
+			  fi
 			  ;;
 		  -l | --filealias ) shift
 			  LOGGLY_FILE_TO_MONITOR_ALIAS=$1
+			  #keeping a copy of it as we need it in the loop
+			  FILE_ALIAS=$LOGGLY_FILE_TO_MONITOR_ALIAS
 			  CONF_FILE_FORMAT_NAME=$CONF_FILE_FORMAT_NAME$1
 			  echo "File alias: $LOGGLY_FILE_TO_MONITOR_ALIAS"
 			  ;;
