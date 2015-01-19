@@ -17,6 +17,8 @@ LOGGLY_FILE_TO_MONITOR=
 #alias name, will be used as tag & state file name etc. provided by user
 LOGGLY_FILE_TO_MONITOR_ALIAS=
 FILE_ALIAS=
+STATE_FILE_ALIAS=
+UNIQUE_VALUE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 
 #file alias provided by the user
 APP_TAG="\"file-alias\":\"\""
@@ -145,10 +147,10 @@ checkIfFileLocationContainSpaces()
 constructFileVariables()
 {
 	#conf file name
-	FILE_SYSLOG_CONFFILE="$RSYSLOG_ETCDIR_CONF/21-filemonitoring-$LOGGLY_FILE_TO_MONITOR_ALIAS.conf"
+	FILE_SYSLOG_CONFFILE="$RSYSLOG_ETCDIR_CONF/21-filemonitoring-$FILE_ALIAS.conf"
 
 	#conf file backup name
-	FILE_SYSLOG_CONFFILE_BACKUP="$FILE_SYSLOG_CONFFILE.loggly.bk"
+	FILE_SYSLOG_CONFFILE_BACKUP="$FILE_ALIAS.loggly.bk"
 
 	#application tag
 	APP_TAG="\"file-alias\":\"$LOGGLY_FILE_TO_MONITOR_ALIAS\""
@@ -192,7 +194,6 @@ configureDirectoryFileMonitoring()
 		for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
 		do
 			configureFilesPresentInDirectory $file $FILE_ALIAS
-			doCronInstallation
 		done		
 	fi
 }
@@ -220,6 +221,8 @@ configureFilesPresentInDirectory()
 			checkFileReadPermission
 			checkLogFileSize $FILE_TO_MONITOR
 			installLogglyConf
+			addTagsInConfiguration
+			STATE_FILE_ALIAS=$UNIQUE_VALUE-$FILE_ALIAS
 			write21ConfFileContents
 		fi
 	fi
@@ -256,10 +259,9 @@ deleteStateFile()
 {
 	sudo rm -f $FILE_SYSLOG_CONFFILE
 	restartRsyslog
-	sudo rm -f $RSYSLOG_DIR/stat-$LOGGLY_FILE_TO_MONITOR_ALIAS
+	sudo rm -f $RSYSLOG_DIR/stat-$FILE_ALIAS
 	restartRsyslog
 }
-
 
 #check if the file alias is already taken
 checkIfFileAliasExist()
@@ -354,7 +356,6 @@ addTagsInConfiguration()
 	done
 }
 
-
 doCronInstallation()
 {	
 	CRON_SCRIPT="/tmp/21-filemonitoring-cron-$FILE_ALIAS.sh"
@@ -364,25 +365,13 @@ sudo touch $CRON_SCRIPT
 sudo chmod +x $CRON_SCRIPT
 
 cronScriptStr="#!/bin/bash
-curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
 
-FILE_TO_MONITOR=
-for file in \$(find ${LOGGLY_FILE_TO_MONITOR} -mmin -\$((60*24)) )
-do
-	FILE_TO_MONITOR=\$file
-	fileNameWithExt=\${file##*/}
-	uniqueFileName=$(echo "\$fileNameWithExt" | tr . _)
-	var1=\$(file \$FILE_TO_MONITOR)
-	var1=\$(echo \$var1 | tr "[:upper:]" "[:lower:]")
-	if [[ \$var1 == *text* ]]; then
-		LOGGLY_FILE_TO_MONITOR_ALIAS=\$uniqueFileName-$FILE_ALIAS
-		if [ -f \${FILE_TO_MONITOR} ]; then
-			sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f \$FILE_TO_MONITOR -l \$LOGGLY_FILE_TO_MONITOR_ALIAS -tag $LOGGLY_FILE_TAG -s
-		fi
-	fi
-done
+sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE.bk
+sudo rm -f $FILE_SYSLOG_CONFFILE
+sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f $LOGGLY_FILE_TO_MONITOR -l $FILE_ALIAS -tag $LOGGLY_FILE_TAG -s
 "
-	#write to cron script file
+#write to cron script file
+
 sudo cat << EOIPFW >> $CRON_SCRIPT
 $cronScriptStr
 EOIPFW
@@ -411,7 +400,8 @@ write21ConfFileContents()
 	sudo touch $FILE_SYSLOG_CONFFILE
 	sudo chmod o+w $FILE_SYSLOG_CONFFILE
 
-	imfileStr="\$ModLoad imfile
+	imfileStr="
+	\$ModLoad imfile
 	\$InputFilePollInterval 10
 	\$WorkDirectory $RSYSLOG_DIR
 	"
@@ -424,7 +414,7 @@ write21ConfFileContents()
 	# File access file:
 	\$InputFileName $FILE_TO_MONITOR
 	\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS:
-	\$InputFileStateFile stat-$LOGGLY_FILE_TO_MONITOR_ALIAS
+	\$InputFileStateFile stat-$STATE_FILE_ALIAS
 	\$InputFileSeverity info
 	\$InputFilePersistStateInterval 20000
 	\$InputRunFileMonitor
@@ -484,6 +474,7 @@ checkIfFileLogsMadeToLoggly()
 		checkIfLogsAreParsedInLoggly
 	fi
 }
+
 #verifying if the logs are being parsed or not
 checkIfLogsAreParsedInLoggly()
 {
@@ -504,6 +495,7 @@ checkIfLogsAreParsedInLoggly()
 		logMsgToConfigSysLog "WARN" "WARN: We received your logs but they do not appear to use one of our automatically parsed formats. You can still do full text search and counts on these logs, but you won't be able to use our field explorer. Please consider switching to one of our automated formats https://www.loggly.com/docs/automated-parsing/"
 	fi
 }
+
 #checks if the conf file exist. Name of conf file is constructed using the file alias name provided
 checkIfConfFileExist()
 {
@@ -564,14 +556,16 @@ if [ "$1" != "being-invoked" ]; then
 			  LOGGLY_ROLLBACK="true"
 			  ;;
 		  -f | --filename ) shift
-			  LOGGLY_FILE_TO_MONITOR=$(readlink -f "$1")
+			  
+			  LOGGLY_FILE_TO_MONITOR="$1"
+			  
 			  if [ -f "$LOGGLY_FILE_TO_MONITOR" ];then
 				
+				LOGGLY_FILE_TO_MONITOR=$(readlink -f "$1")
 				FILE_TO_MONITOR=$LOGGLY_FILE_TO_MONITOR
 				echo "File to monitor: $LOGGLY_FILE_TO_MONITOR"
 			  
 			  elif [ -d "$LOGGLY_FILE_TO_MONITOR" ] || checkIfWildcardExist ; then
-				
 				IS_DIRECTORY="true"
 				echo "Directory to monitor: $LOGGLY_FILE_TO_MONITOR"
 				
@@ -584,6 +578,7 @@ if [ "$1" != "being-invoked" ]; then
 			  LOGGLY_FILE_TO_MONITOR_ALIAS=$1
 			  #keeping a copy of it as we need it in the loop
 			  FILE_ALIAS=$LOGGLY_FILE_TO_MONITOR_ALIAS
+			  STATE_FILE_ALIAS=$LOGGLY_FILE_TO_MONITOR_ALIAS
 			  CONF_FILE_FORMAT_NAME=$CONF_FILE_FORMAT_NAME$1
 			  echo "File alias: $LOGGLY_FILE_TO_MONITOR_ALIAS"
 			  ;;
