@@ -368,7 +368,7 @@ checkIfRsyslogConfiguredAsService()
 		exit 1
 	fi
 
-	if [ $(ps -ef | grep -v grep | grep "$RSYSLOG_SERVICE" | wc -l) -eq 0 ]; then
+	if [ $(ps -A | grep "$RSYSLOG_SERVICE" | wc -l) -eq 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is not running. Attempting to start service."
 		sudo service $RSYSLOG_SERVICE start
 	fi
@@ -385,7 +385,7 @@ checkifSyslogNgConfiguredAsService()
 #check if multiple versions of rsyslog is configured
 checkIfMultipleRsyslogConfigured()
 {
-	if [ $(ps -ef | grep -v grep | grep "$RSYSLOG_SERVICE" | wc -l) -gt 1 ]; then
+	if [ $(ps -A | grep "$RSYSLOG_SERVICE" | wc -l) -gt 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Multiple (more than 1) $RSYSLOG_SERVICE is running."
 		exit 1
 	fi
