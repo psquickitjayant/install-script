@@ -257,7 +257,6 @@ checkIfFileExist()
 #deletes the state file for the current alias, if exists
 deleteStateFile()
 {
-	sudo rm -f $FILE_SYSLOG_CONFFILE
 	restartRsyslog
 	sudo rm -f $RSYSLOG_DIR/stat-$FILE_ALIAS
 	restartRsyslog
@@ -320,7 +319,7 @@ checkLogFileSize()
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from $LOGGLY_FILE_TO_MONITOR so there won't be any data sent to Loggly. You can generate some logs by writing to this file."
 		exit 1
 	else
-		logMsgToConfigSysLog "INFO" "INFO: File size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes."
+		logMsgToConfigSysLog "INFO" "INFO: File size of $FILE_TO_MONITOR is $monitorFileSize bytes."
 	fi
 }
 
@@ -358,16 +357,18 @@ addTagsInConfiguration()
 
 doCronInstallation()
 {	
-	CRON_SCRIPT="/tmp/21-filemonitoring-cron-$FILE_ALIAS.sh"
+	if [ ! -d "$HOME/loggly" ]; then
+		mkdir $HOME/loggly
+	fi
+	CRON_SCRIPT="$HOME/loggly/file-monitoring-cron-$FILE_ALIAS.sh"
 	logMsgToConfigSysLog "INFO" "INFO: Creating cron script $CRON_SCRIPT"
 
 sudo touch $CRON_SCRIPT
 sudo chmod +x $CRON_SCRIPT
 
 cronScriptStr="#!/bin/bash
+curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
 
-sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE.bk
-sudo rm -f $FILE_SYSLOG_CONFFILE
 sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f $LOGGLY_FILE_TO_MONITOR -l $FILE_ALIAS -tag $LOGGLY_FILE_TAG -s
 "
 #write to cron script file
@@ -379,7 +380,7 @@ EOIPFW
 	CRON_JOB_TO_MONITOR_FILES="*/5 * * * * sudo bash $CRON_SCRIPT"
 	CRON_FILE="/tmp/File_Monitor_Cron"
 
-	EXISTING_CRONS=$(sudo crontab -l 2>&1)
+	EXISTING_CRONS=$(crontab -l 2>&1)
 	case $EXISTING_CRONS in
 		no*)
 		;;
@@ -389,7 +390,7 @@ EOIPFW
 	esac
 	
 	echo "$CRON_JOB_TO_MONITOR_FILES" >> $CRON_FILE
-	sudo crontab $CRON_FILE
+	crontab $CRON_FILE
 	sudo rm -fr $CRON_FILE	
 }
 
@@ -470,7 +471,7 @@ checkIfFileLogsMadeToLoggly()
 	done
 
 	if [ "$fileLatestLogCount" -gt "$fileInitialLogCount" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Logs successfully transferred to Loggly! You are now sending $FILE_TO_MONITOR logs to Loggly."
+		logMsgToConfigSysLog "INFO" "INFO: Logs successfully transferred to Loggly! You are now sending $LOGGLY_FILE_TO_MONITOR logs to Loggly."
 		checkIfLogsAreParsedInLoggly
 	fi
 }
