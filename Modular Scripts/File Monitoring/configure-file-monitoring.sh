@@ -2,7 +2,7 @@
 
 #downloads configure-linux.sh
 echo "INFO: Downloading dependencies - configure-linux.sh"
-curl -s -o configure-linux.sh https://www.loggly.com/install/configure-linux.sh
+curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/script-dev/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
@@ -18,7 +18,6 @@ LOGGLY_FILE_TO_MONITOR=
 LOGGLY_FILE_TO_MONITOR_ALIAS=
 FILE_ALIAS=
 STATE_FILE_ALIAS=
-UNIQUE_VALUE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 
 #file alias provided by the user
 APP_TAG="\"file-alias\":\"\""
@@ -159,7 +158,6 @@ constructFileVariables()
 #configures the directory files for file monitoring
 configureDirectoryFileMonitoring()
 {
-	addTagsInConfiguration
 	TOTAL_FILES_IN_DIR=$(ls -1 ${LOGGLY_FILE_TO_MONITOR} | wc -l)
 	logMsgToConfigSysLog "INFO" "INFO: There are $TOTAL_FILES_IN_DIR files in directory. Configuring each file for monitoring present in this directory."
 	if [ "$SUPPRESS_PROMPT" == "false" ]; then
@@ -222,7 +220,7 @@ configureFilesPresentInDirectory()
 			checkLogFileSize $FILE_TO_MONITOR
 			installLogglyConf
 			addTagsInConfiguration
-			STATE_FILE_ALIAS=$UNIQUE_VALUE-$FILE_ALIAS
+			STATE_FILE_ALIAS=$(echo -n "$uniqueFileName" | md5sum | tr -d ' ')$FILE_ALIAS
 			write21ConfFileContents
 		fi
 	fi
@@ -367,7 +365,7 @@ sudo touch $CRON_SCRIPT
 sudo chmod +x $CRON_SCRIPT
 
 cronScriptStr="#!/bin/bash
-curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
+curl -s -o configure-file-monitoring.sh https://raw.githubusercontent.com/psquickitjayant/install-script/script-dev/Modular%20Scripts/File%20Monitoring/configure-file-monitoring.sh
 
 sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f $LOGGLY_FILE_TO_MONITOR -l $FILE_ALIAS -tag $LOGGLY_FILE_TAG -s
 "
