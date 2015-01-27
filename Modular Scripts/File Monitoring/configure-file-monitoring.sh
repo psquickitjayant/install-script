@@ -28,7 +28,7 @@ FILE_SYSLOG_CONFFILE=
 #name and location of syslog backup file
 FILE_SYSLOG_CONFFILE_BACKUP=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable is set if the script is invoked via some other calling script
 IS_FILE_MONITOR_SCRIPT_INVOKED="false"
@@ -129,6 +129,8 @@ removeLogglyConfForFile()
 	#restart rsyslog
 	restartRsyslog
 	
+	removeStatFile
+	
 	#log success message
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
@@ -158,6 +160,7 @@ constructFileVariables()
 #configures the directory files for file monitoring
 configureDirectoryFileMonitoring()
 {
+	addTagsInConfiguration
 	TOTAL_FILES_IN_DIR=$(ls -1 ${LOGGLY_FILE_TO_MONITOR} | wc -l)
 	logMsgToConfigSysLog "INFO" "INFO: There are $TOTAL_FILES_IN_DIR files in directory. Configuring each file for monitoring present in this directory."
 	if [ "$SUPPRESS_PROMPT" == "false" ]; then
@@ -219,7 +222,6 @@ configureFilesPresentInDirectory()
 			checkFileReadPermission
 			checkLogFileSize $FILE_TO_MONITOR
 			installLogglyConf
-			addTagsInConfiguration
 			STATE_FILE_ALIAS=$(echo -n "$uniqueFileName" | md5sum | tr -d ' ')$FILE_ALIAS
 			write21ConfFileContents
 		fi
@@ -336,7 +338,7 @@ checkFileReadPermission()
 			FILE_PERMISSIONS=$(ls -l $LOGGLY_FILE_TO_MONITOR)
 			#checking if the file has read permission for others
 			PERMISSION_READ_OTHERS=${FILE_PERMISSIONS:7:1}
-			if [ $PERMISSION_READ_OTHERS != r ]; then 
+			if [[ $PERMISSION_READ_OTHERS != r ]]; then 
 				logMsgToConfigSysLog "WARN" "WARN: $LOGGLY_FILE_TO_MONITOR does not have proper read permissions. Verification step may fail."
 			fi
 		;;
@@ -355,7 +357,7 @@ addTagsInConfiguration()
 
 doCronInstallation()
 {	
-	if [ ! -d "$HOME/loggly" ]; then
+	if [[ ! -d "$HOME/loggly" ]]; then
 		mkdir $HOME/loggly
 	fi
 	CRON_SCRIPT="$HOME/loggly/file-monitoring-cron-$FILE_ALIAS.sh"
@@ -365,7 +367,10 @@ sudo touch $CRON_SCRIPT
 sudo chmod +x $CRON_SCRIPT
 
 cronScriptStr="#!/bin/bash
-curl -s -o configure-file-monitoring.sh https://raw.githubusercontent.com/psquickitjayant/install-script/script-dev/Modular%20Scripts/File%20Monitoring/configure-file-monitoring.sh
+#curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
+
+sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE.bk
+sudo rm -f $FILE_SYSLOG_CONFFILE
 
 sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f $LOGGLY_FILE_TO_MONITOR -l $FILE_ALIAS -tag $LOGGLY_FILE_TAG -s
 "
@@ -378,7 +383,7 @@ EOIPFW
 	CRON_JOB_TO_MONITOR_FILES="*/5 * * * * sudo bash $CRON_SCRIPT"
 	CRON_FILE="/tmp/File_Monitor_Cron"
 
-	EXISTING_CRONS=$(crontab -l 2>&1)
+	EXISTING_CRONS=$(sudo crontab -l 2>&1)
 	case $EXISTING_CRONS in
 		no*)
 		;;
@@ -388,7 +393,7 @@ EOIPFW
 	esac
 	
 	echo "$CRON_JOB_TO_MONITOR_FILES" >> $CRON_FILE
-	crontab $CRON_FILE
+	sudo crontab $CRON_FILE
 	sudo rm -fr $CRON_FILE	
 }
 
@@ -510,12 +515,24 @@ remove21ConfFile()
 	echo "INFO: Deleting the loggly syslog conf file $FILE_SYSLOG_CONFFILE."
 	if [ -f "$FILE_SYSLOG_CONFFILE" ]; then
 		sudo rm -rf "$FILE_SYSLOG_CONFFILE"
+		deleteFileFromCrontab
 		if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "false" ]; then
 			echo "INFO: Removed all the modified files."
 		fi
 	else
 		logMsgToConfigSysLog "WARN" "WARN: $FILE_SYSLOG_CONFFILE file was not found."
 	fi	
+}
+
+deleteFileFromCrontab()
+{
+	logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
+	sudo crontab -l | grep -v  "$FILE_ALIAS" | crontab -
+}
+
+removeStatFile()
+{
+	sudo rm -f $RSYSLOG_DIR/stat-*$FILE_ALIAS
 }
 
 #display usage syntax
@@ -556,7 +573,7 @@ if [ "$1" != "being-invoked" ]; then
 			  ;;
 		  -f | --filename ) shift
 			  
-			  LOGGLY_FILE_TO_MONITOR="$1"
+			  LOGGLY_FILE_TO_MONITOR="${1%/}"
 			  
 			  if [ -f "$LOGGLY_FILE_TO_MONITOR" ];then
 				
