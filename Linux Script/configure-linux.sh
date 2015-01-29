@@ -500,6 +500,12 @@ inputStr="
 # Define the template used for sending logs to Loggly. Do not change this format.
 \$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3] %msg%\n\"
 
+\$WorkDirectory /var/spool/rsyslog # where to place spool files
+\$ActionQueueFileName fwdRule1 # unique name prefix for spool files
+\$ActionQueueMaxDiskSpace 1g   # 1gb space limit (use as much as possible)
+\$ActionQueueSaveOnShutdown on # save messages to disk on shutdown
+\$ActionQueueType LinkedList   # run asynchronously
+\$ActionResumeRetryCount -1    # infinite retries if host is down
 # Send messages to Loggly over TCP using the template.
 *.*             @@$4:$5;LogglyFormat
 
