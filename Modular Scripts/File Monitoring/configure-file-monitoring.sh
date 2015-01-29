@@ -527,7 +527,12 @@ remove21ConfFile()
 deleteFileFromCrontab()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
+	
+	#delete cron
 	sudo crontab -l | grep -v  "$FILE_ALIAS" | crontab -
+	
+	#delete cron script
+	sudo rm -f $HOME/loggly/file-monitoring-cron-$FILE_ALIAS.sh
 }
 
 removeStatFile()
