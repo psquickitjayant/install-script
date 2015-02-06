@@ -195,6 +195,9 @@ configureDirectoryFileMonitoring()
 		for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
 		do
 			configureFilesPresentInDirectory $file $FILE_ALIAS
+			if [[ ! -f "$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ]]; then
+				doCronInstallation
+			fi
 		done		
 	fi
 }
@@ -357,10 +360,10 @@ addTagsInConfiguration()
 
 doCronInstallation()
 {	
-	if [[ ! -d "$HOME/loggly" ]]; then
-		mkdir $HOME/loggly
+	if [[ ! -d "$HOME/.loggly" ]]; then
+		mkdir $HOME/.loggly
 	fi
-	CRON_SCRIPT="$HOME/loggly/file-monitoring-cron-$FILE_ALIAS.sh"
+	CRON_SCRIPT="$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh"
 	logMsgToConfigSysLog "INFO" "INFO: Creating cron script $CRON_SCRIPT"
 
 sudo touch $CRON_SCRIPT
@@ -503,7 +506,7 @@ checkIfLogsAreParsedInLoggly()
 #checks if the conf file exist. Name of conf file is constructed using the file alias name provided
 checkIfConfFileExist()
 {
-	if [ ! -f "$FILE_SYSLOG_CONFFILE" ]; then
+	if [[ ! -f "$FILE_SYSLOG_CONFFILE" ]]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Invalid File Alias provided."
 		exit 1
 	fi
@@ -525,14 +528,19 @@ remove21ConfFile()
 }
 
 deleteFileFromCrontab()
-{
-	logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
+{	
+	if [ -f "$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ];then
+
+		logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
 	
-	#delete cron
-	sudo crontab -l | grep -v  "$FILE_ALIAS" | crontab -
+		#delete cron
+		sudo crontab -l | grep -v  "$FILE_ALIAS" | crontab -
 	
-	#delete cron script
-	sudo rm -f $HOME/loggly/file-monitoring-cron-$FILE_ALIAS.sh
+		#delete cron script
+		sudo rm -f $HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh
+	
+	fi
+
 }
 
 removeStatFile()
