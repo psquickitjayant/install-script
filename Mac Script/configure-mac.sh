@@ -148,6 +148,30 @@ installLogglyConf()
 	fi
 }	
 
+
+#remove loggly configuration from Linux system
+removeLogglyConf()
+{
+	#log message indicating starting of Loggly configuration
+	logMsgToConfigSysLog "INFO" "INFO: Initiating uninstall Loggly for Mac."
+
+	#check if the user has root permission to run this script
+	checkIfUserHasRootPrivileges
+
+	#check if the OS is supported by the script. If no, then exit
+	checkIfSupportedOS
+
+	#set the basic variables needed by this script
+	setMacVariables
+
+	#remove loggly.conf file
+	removeLogglyConfFile
+
+
+	#log success message
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Uninstalled Loggly configuration from Mac system."
+}
+
 #checks if the script is run as a sudo user
 checkIfUserHasRootPrivileges()
 {
@@ -164,11 +188,8 @@ checkIfSupportedOS()
 {
     # Determine OS platform
     UNAME=$(uname | tr "[:upper:]" "[:lower:]")
-    $MAC_DIST=$UNAME
-
-	MAC_DIST_IN_LOWER_CASE=$(echo $MAC_DIST | tr "[:upper:]" "[:lower:]")
-	
-	if [["$MAC_DIST_IN_LOWER_CASE"="$MAC_DIST"]]; then
+    MAC_DIST=$UNAME
+	if [ "$MAC_DIST" == "darwin" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Operating system is Mac"
 	else
 		logMsgToConfigSysLog "ERROR": "ERROR: This script supports only Mac systems. You can find alternative options here: https://www.loggly.com/docs/sending-logs-unixlinux-system-setup/"
@@ -191,13 +212,13 @@ setMacVariables()
 #checks if all the various endpoints used for configuring loggly are accessible
 checkIfLogglyServersAccessible()
 {
-	"INFO: Checking if $LOGS_01_HOST is reachable."
-	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 packets received, 0.0% packet loss" | wc -l) == 1 ]; then
-		echo "INFO: $LOGS_01_HOST is reachable."
-	else
-		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings."
-		exit 1
-	fi
+	logMsgToConfigSysLog "INFO" "INFO: Checking if $LOGS_01_HOST is reachable."
+        if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 packets received, 0.0% packet loss" | wc -l) == 1 ]; then
+                logMsgToConfigSysLog "INFO" "INFO: $LOGS_01_HOST is reachable."
+        else
+                logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings."
+                exit 1
+        fi
 
 	echo "INFO: Checking if $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port. This may take some time."
 	if [ $(curl --connect-timeout 10 $LOGS_01_HOST:$LOGGLY_SYSLOG_PORT 2>&1 | grep "Empty reply from server" | wc -l) == 1 ]; then
@@ -352,17 +373,32 @@ EOIPFW
 
 }
 
+#delete 22-loggly.conf file
+removeLogglyConfFile()
+{
+	if [ -f "$HOME/.loggly/fluentd-loggly.conf" ]; then
+		logMsgToConfigSysLog "INFO" "INFO: Deleting file fluentd-loggly.conf"
+		sudo rm -rf "$HOME/.loggly/fluentd-loggly.conf"
+		
+		logMsgToConfigSysLog "INFO" "INFO: Removing Fluentd service"
+		sudo launchctl unload -F /Library/LaunchDaemons/com.loggly.loggly_fluentd.plist > /dev/null 2>&1
+		sudo rm -rf /Library/LaunchDaemons/com.loggly.loggly_fluentd.plist
+	else
+		logMsgToConfigSysLog "ERROR" "ERROR: There is no conf file to delete"	
+		exit 1
+	fi
+}
+
 #this function creates a fluentd daemon to send logs to Loggly
 configureFluentdAsService()
 {
-
 	logMsgToConfigSysLog "INFO" "INFO: Creating daemon for Loggly conf file."
-	PROP_FILE= $HOME/Library/LaunchDaemons/com.loggly.loggly_fluentd.plist
-	sudo touch $PROP_FILE
+        PROP_FILE="/Library/LaunchDaemons/com.loggly.loggly_fluentd.plist"
+        sudo touch $PROP_FILE
+        sudo chmod +x $PROP_FILE
 
 propStr="
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
 		<key>Label</key>
@@ -400,10 +436,10 @@ startFluentdService()
 checkIfLogsMadeToLoggly()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly."
-	uuid=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+	uuid=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)	
 
-	queryParam="syslog.appName%3ALOGGLYVERIFY%20$uuid"
-	logger -t "LOGGLYVERIFY" "LOGGLYVERIFY-Test message for verification with UUID $uuid"
+	queryParam="tag%3AMac%20$uuid"
+	logger -t "Mac" "Mac-Test message for verification with UUID $uuid"
 
 	counter=1
 	maxCounter=10
@@ -555,7 +591,7 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: configure-mac [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
+usage: configure-mac [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
 usage: configure-mac [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-mac [-h for help]
 EOF
@@ -586,9 +622,6 @@ if [ "$1" != "being-invoked" ]; then
 				;;
 			-r | --remove )
 				LOGGLY_REMOVE="true"
-				;;
-			-s | --suppress )
-				SUPPRESS_PROMPT="true"
 				;;
 			-h | --help)
 				usage
