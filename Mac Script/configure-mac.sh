@@ -235,14 +235,6 @@ checkIfLogglyServersAccessible()
 		logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
 		exit 1
 	fi
-	
-	echo "INFO: Checking if Gen2 account."
-	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
-		exit 1
-	else
-		logMsgToConfigSysLog "INFO" "INFO: It is a Gen2 account."
-	fi
 }
 
 #check if user name and password is valid
@@ -551,7 +543,7 @@ searchAndFetch()
 {
 	url=$2
 	
-	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
+	result=$(curl -s -u "$LOGGLY_USERNAME":"$LOGGLY_PASSWORD" "$url" )
 	
 	if [ -z "$result" ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
@@ -565,7 +557,7 @@ searchAndFetch()
 	url="$LOGGLY_ACCOUNT_URL/apiv2/events?rsid=$id"
 
 	# retrieve the data
-	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
+	result=$(curl -s -u "$LOGGLY_USERNAME":"$LOGGLY_PASSWORD" "$url" )
 	count=$(echo "$result" | grep total_events | awk '{print $2}')
 	count="${count%\,}"
 	eval $1="'$count'"
