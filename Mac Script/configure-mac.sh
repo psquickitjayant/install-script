@@ -84,6 +84,9 @@ SUPPRESS_PROMPT="false"
 #plist file path
 PROP_FILE=
 
+#manual instructions to be show in case of error
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/send-mac-logs-to-loggly/.
+
 checkMacLogglyCompatibility()
 {	
 	#check if the user has root permission to run this script
@@ -110,7 +113,7 @@ checkMacLogglyCompatibility()
 	#check if minimum version of ruby is installed
 	checkIfMinRubyVersionInstalled
 	
-    MAC_ENV_VALIDATED="true"
+        MAC_ENV_VALIDATED="true"
 }
 
 # executing the script for loggly to install and configure fluentd.
@@ -242,9 +245,9 @@ checkIfValidUserNamePassword()
 {
 	echo "INFO: Checking if provided username and password is correct."
 	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
-			logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
-			logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password."
-			exit 1
+		logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
+		logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password."
+		exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
 	fi
@@ -516,6 +519,7 @@ logMsgToConfigSysLog()
 	#if it is an error, then log message "Script Failed" to config syslog and exit the script
 	if [[ $cslStatus == "ERROR" ]]; then
 		sendPayloadToConfigSysLog "ERROR" "Script Failed" "$enabler"
+		echo $MANUAL_CONFIG_INSTRUCTION
 		exit 1
 	fi
 
