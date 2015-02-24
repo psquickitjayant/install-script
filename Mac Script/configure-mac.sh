@@ -463,10 +463,10 @@ checkIfLogsMadeToLoggly()
 
 	if [ "$finalCount" -eq 1 ]; then
 		if [ "$IS_INVOKED" = "" ]; then
-			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly."
+			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Mac system logs to Loggly."
 	 		exit 0
 		else
-			logMsgToConfigSysLog "INFO" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly."
+			logMsgToConfigSysLog "INFO" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Mac system logs to Loggly."
  		fi
 	fi
 
