@@ -359,7 +359,7 @@ inputStr="
 </source>
 <match **>
    type loggly
-   loggly_url  https://logs-01.loggly.com/inputs/$LOGGLY_AUTH_TOKEN/tag/Mac
+   loggly_url  http://logs-01.loggly.com/inputs/$LOGGLY_AUTH_TOKEN/tag/Mac
 </match>"
 
 sudo cat << EOIPFW >> $FLUENTD_CONF
@@ -388,7 +388,19 @@ removeLogglyConfFile()
 configureFluentdAsService()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Creating daemon for Loggly conf file."
-        PROP_FILE="/Library/LaunchDaemons/com.loggly.loggly_fluentd.plist"
+	
+	PROP_FILE="/Library/LaunchDaemons/com.loggly.loggly_fluentd.plist"
+	
+	#if loggly fluentd is already running as a service then unload it
+	if [ sudo launchctl list | grep 'com.loggly.loggly_fluentd' | wc -gt 0 ]; then
+	    sudo launchctl unload -F $PROP_FILE
+	fi
+	
+	#if plist file is already there then delete it
+	if [ -f "$PROP_FILE" ]; then
+	    sudo rm -f $PROP_FILE
+	fi
+	
         sudo touch $PROP_FILE
         sudo chmod +x $PROP_FILE
 
