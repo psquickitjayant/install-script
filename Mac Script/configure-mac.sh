@@ -392,8 +392,11 @@ configureFluentdAsService()
 	PROP_FILE="/Library/LaunchDaemons/com.loggly.loggly_fluentd.plist"
 	
 	#if loggly fluentd is already running as a service then unload it
-	if [ sudo launchctl list | grep 'com.loggly.loggly_fluentd' | wc -gt 0 ]; then
-	    sudo launchctl unload -F $PROP_FILE
+	if [ $(sudo launchctl list | grep 'com.loggly.loggly_fluentd' | wc -l) == 1 ]; then
+	    sudo launchctl unload -F $PROP_FILE > /dev/null 2>&1
+		
+		#if there was some error while unloading, just remove it
+		sudo launchctl remove com.loggly.loggly_fluentd  > /dev/null 2>&1
 	fi
 	
 	#if plist file is already there then delete it
@@ -401,8 +404,8 @@ configureFluentdAsService()
 	    sudo rm -f $PROP_FILE
 	fi
 	
-        sudo touch $PROP_FILE
-        sudo chmod +x $PROP_FILE
+	sudo touch $PROP_FILE
+    sudo chmod +x $PROP_FILE
 
 propStr="
 <?xml version="1.0" encoding="UTF-8"?>
@@ -435,7 +438,7 @@ EOIPFW
 startFluentdService()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Starting Fluentd as a service"
-	launchctl load -F $PROP_FILE
+	sudo launchctl load -F $PROP_FILE
 	logMsgToConfigSysLog "INFO" "INFO: Fluentd started successfully"
 }
 
