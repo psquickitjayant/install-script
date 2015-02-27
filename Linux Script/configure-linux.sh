@@ -488,6 +488,8 @@ inputStr="
 				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 				WRITE_SCRIPT_CONTENTS="true"
 			fi
+		else
+			 LINUX_DO_VERIFICATION="false"
 		fi
 	else
 		WRITE_SCRIPT_CONTENTS="true"

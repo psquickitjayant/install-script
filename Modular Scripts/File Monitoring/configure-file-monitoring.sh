@@ -168,6 +168,7 @@ configureDirectoryFileMonitoring()
 		read -p "There are $TOTAL_FILES_IN_DIR files present in this directory. Would you like to configure all the files (yes/no)?" yn
 		case $yn in
 			[Yy]* )
+				installLogglyConf
 				for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
 				do
 					configureFilesPresentInDirectory $file $FILE_ALIAS
@@ -192,6 +193,7 @@ configureDirectoryFileMonitoring()
 			esac
 		done
 	else
+		installLogglyConf
 		for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
 		do
 			configureFilesPresentInDirectory $file $FILE_ALIAS
@@ -224,7 +226,6 @@ configureFilesPresentInDirectory()
 			constructFileVariables
 			checkFileReadPermission
 			checkLogFileSize $FILE_TO_MONITOR
-			installLogglyConf
 			STATE_FILE_ALIAS=$(echo -n "$uniqueFileName" | md5sum | tr -d ' ')$FILE_ALIAS
 			write21ConfFileContents
 		fi
