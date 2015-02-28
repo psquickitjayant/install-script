@@ -421,7 +421,7 @@ propStr="
 		<array>
 			<string>/usr/local/bin/fluentd</string>
 			<string>-c</string>
-			<string>/$HOME/.loggly/fluentd-loggly.conf</string>
+			<string>$HOME/.loggly/fluentd-loggly.conf</string>
 		</array>
 		<key>RunAtLoad</key>
 		<true/>
