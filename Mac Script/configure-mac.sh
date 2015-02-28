@@ -305,7 +305,7 @@ checkIfMinRubyVersionInstalled()
 #this functions checks if the Fluentd gem is installed in the system
 checkIfFluentdInstalled()
 {
-    if [ "fluentd --setup ./fluent" ];then
+    if [ -f "usr/local/bin/fluentd" ]; then
         logMsgToConfigSysLog "INFO" "INFO: Fluentd is already installed. Not installing."
     else
         installFluentd
@@ -315,11 +315,15 @@ checkIfFluentdInstalled()
 #this function installs the Fluentd in the system
 installFluentd()
 {
+	#install fluentd gem http://docs.fluentd.org/articles/install-by-gem
 	sudo gem install fluentd --no-ri --no-rdoc
 	
 	#to check fluentd installed successfully
-	if [ "fluentd --setup ./fluent" ];then
+	if [ -f "usr/local/bin/fluentd" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Fluentd installed Successfully"
+	else
+		logMsgToConfigSysLog "ERROR" "ERROR: Unable to install fluentd"
+		exit 1
 	fi
 }
 
