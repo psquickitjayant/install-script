@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #trapping Control + C
 #these statements must be the first statements in the script to trap the CTRL C event
 
@@ -305,9 +307,10 @@ checkIfMinRubyVersionInstalled()
 #this functions checks if the Fluentd gem is installed in the system
 checkIfFluentdInstalled()
 {
-    if [ -f "usr/local/bin/fluentd" ]; then
+    if [ $(fluentd --setup ./fluent | grep "./fluent/fluent.conf" | wc -l ) == 1 ]; then
         logMsgToConfigSysLog "INFO" "INFO: Fluentd is already installed. Not installing."
     else
+    	logMsgToConfigSysLog "INFO" "INFO: Fluentd is not installed. Installing Fluentd. This may take a while."
         installFluentd
     fi
 }
@@ -319,7 +322,7 @@ installFluentd()
 	sudo gem install fluentd --no-ri --no-rdoc
 	
 	#to check fluentd installed successfully
-	if [ -f "usr/local/bin/fluentd" ]; then
+	if [ $(fluentd --setup ./fluent | grep "./fluent/fluent.conf" | wc -l ) == 1 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Fluentd installed Successfully"
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: Unable to install fluentd"
