@@ -396,6 +396,9 @@ configureFluentdAsService()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Creating daemon for Loggly conf file."
 	
+	#this sets the fluentd installation location
+	FLUENTD_LOCATION=$(which fluentd)
+	
 	PROP_FILE="/Library/LaunchDaemons/com.loggly.loggly_fluentd.plist"
 	
 	#if loggly fluentd is already running as a service then unload it
@@ -422,7 +425,7 @@ propStr="
 		<string>com.loggly.loggly_fluentd</string>
 		<key>ProgramArguments</key>
 		<array>
-			<string>/usr/local/bin/fluentd</string>
+			<string>$FLUENTD_LOCATION</string>
 			<string>-c</string>
 			<string>$HOME/.loggly/fluentd-loggly.conf</string>
 		</array>
