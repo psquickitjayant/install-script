@@ -169,8 +169,8 @@ configureDirectoryFileMonitoring()
 		case $yn in
 			[Yy]* )
 				installLogglyConf
-				for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
-				do
+				for file in $(find $LOGGLY_FILE_TO_MONITOR -name '*')
+				do	
 					configureFilesPresentInDirectory $file $FILE_ALIAS
 				done
 				break;;
@@ -194,34 +194,29 @@ configureDirectoryFileMonitoring()
 		done
 	else
 		installLogglyConf
-		for file in $( ls ${LOGGLY_FILE_TO_MONITOR} )
-		do
+		for file in $(find $LOGGLY_FILE_TO_MONITOR -name '*')
+		do	
 			configureFilesPresentInDirectory $file $FILE_ALIAS
-			if [[ ! -f "$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ]]; then
-				doCronInstallation
-			fi
-		done		
+		done
+		if [[ ! -f "$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ]]; then
+			doCronInstallation
+		fi
 	fi
 }
 
 #actually configures a file present in the directory for monitoring
 configureFilesPresentInDirectory()
 {
-	if [ "$IS_WILDCARD" == "true" ]; then
-		FILE_TO_MONITOR=$1
-	else
-		FILE_TO_MONITOR=$LOGGLY_FILE_TO_MONITOR/$1
-	fi
+	FILE_TO_MONITOR=$1
 	fileNameWithExt=${1##*/}
 	uniqueFileName=$(echo "$fileNameWithExt" | tr . _)
 	var=$(file $FILE_TO_MONITOR)
-
+	
+	#checking if it is a text file otherwise ignore it
 	#it may be possible that the "text" may contain some uppercase letters like "Text"
 	var=$(echo $var | tr "[:upper:]" "[:lower:]")
-	
 	if [[ $var == *text* ]]; then
 		LOGGLY_FILE_TO_MONITOR_ALIAS=$uniqueFileName-$2
-		
 		if [ -f ${FILE_TO_MONITOR} ]; then
 			constructFileVariables
 			checkFileReadPermission
