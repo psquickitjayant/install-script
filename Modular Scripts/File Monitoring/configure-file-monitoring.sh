@@ -528,7 +528,7 @@ deleteFileFromCrontab()
 		logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
 	
 		#delete cron
-		sudo crontab -l | grep -v  "$FILE_ALIAS.sh" | crontab -
+		sudo crontab -l | grep -v  "file-monitoring-cron-$FILE_ALIAS.sh" | crontab -
 	
 		#delete cron script
 		sudo rm -f /root/.loggly/file-monitoring-cron-$FILE_ALIAS.sh
