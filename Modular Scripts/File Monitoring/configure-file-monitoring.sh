@@ -198,7 +198,7 @@ configureDirectoryFileMonitoring()
 		do	
 			configureFilesPresentInDirectory $file $FILE_ALIAS
 		done
-		if [[ ! -f "$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ]]; then
+		if [[ ! -f "/root/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ]]; then
 			doCronInstallation
 		fi
 	fi
@@ -356,21 +356,19 @@ addTagsInConfiguration()
 
 doCronInstallation()
 {	
-	if [[ ! -d "$HOME/.loggly" ]]; then
-		mkdir $HOME/.loggly
+	if [[ ! -d "/root/.loggly" ]]; then
+		mkdir /root/.loggly
 	fi
-	CRON_SCRIPT="$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh"
+	CRON_SCRIPT="/root/.loggly/file-monitoring-cron-$FILE_ALIAS.sh"
 	logMsgToConfigSysLog "INFO" "INFO: Creating cron script $CRON_SCRIPT"
 
 sudo touch $CRON_SCRIPT
 sudo chmod +x $CRON_SCRIPT
 
 cronScriptStr="#!/bin/bash
-#curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
-
+curl -s -o configure-file-monitoring.sh https://raw.githubusercontent.com/psquickitjayant/install-script/script-dev/Modular%20Scripts/File%20Monitoring/configure-file-monitoring.sh
 sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE.bk
 sudo rm -f $FILE_SYSLOG_CONFFILE
-
 sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f $LOGGLY_FILE_TO_MONITOR -l $FILE_ALIAS -tag $LOGGLY_FILE_TAG -s
 "
 #write to cron script file
@@ -525,15 +523,15 @@ remove21ConfFile()
 
 deleteFileFromCrontab()
 {	
-	if [ -f "$HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ];then
+	if [ -f "/root/.loggly/file-monitoring-cron-$FILE_ALIAS.sh" ];then
 
 		logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
 	
 		#delete cron
-		sudo crontab -l | grep -v  "$FILE_ALIAS" | crontab -
+		sudo crontab -l | grep -v  "$FILE_ALIAS.sh" | crontab -
 	
 		#delete cron script
-		sudo rm -f $HOME/.loggly/file-monitoring-cron-$FILE_ALIAS.sh
+		sudo rm -f /root/.loggly/file-monitoring-cron-$FILE_ALIAS.sh
 	
 	fi
 

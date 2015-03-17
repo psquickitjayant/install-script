@@ -63,9 +63,6 @@ installLogglyConfForS3()
 	#check if s3bucket is valid
 	checkIfValidS3Bucket
 
-	#configure loggly for Linux
-	#installLogglyConf
-	
 	#create temporary directory
 	createTempDir
 
