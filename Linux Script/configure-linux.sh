@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.10
+SCRIPT_VERSION=1.12
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -116,6 +116,9 @@ checkLinuxLogglyCompatibility()
 	#check if authentication token is valid. If no, then exit.
 	checkIfValidAuthToken
 
+	#checking if syslog-ng is configured as a service
+	checkifSyslogNgConfiguredAsService
+	
 	#check if rsyslog is configured as service. If no, then exit
 	checkIfRsyslogConfiguredAsService
 
@@ -378,7 +381,7 @@ checkIfRsyslogConfiguredAsService()
 
 checkifSyslogNgConfiguredAsService()
 {
-	if [ -f /etc/init.d/$SYSLOG_NG_SERVICE ]; then
+	if [ $(ps -A | grep "$SYSLOG_NG_SERVICE" | wc -l) -gt 0  ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This script does not currently support syslog-ng. Please follow the instructions on this page https://www.loggly.com/docs/syslog-ng-manual-configuration"
 		exit 1
 	fi
@@ -393,7 +396,7 @@ checkIfMultipleRsyslogConfigured()
 	fi
 }
 
-#check if mimimum version of rsyslog required to configure loggly is met
+#check if minimum version of rsyslog required to configure loggly is met
 checkIfMinVersionOfRsyslog()
 {
 	RSYSLOG_VERSION=$(sudo $RSYSLOGD -version | grep "$RSYSLOGD")
