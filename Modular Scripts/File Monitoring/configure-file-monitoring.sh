@@ -580,7 +580,7 @@ if [ "$1" != "being-invoked" ]; then
 			  ;;
 		  -f | --filename ) shift
 			  
-			  LOGGLY_FILE_TO_MONITOR="${1%/}"
+			  LOGGLY_FILE_TO_MONITOR="$(readlink -f ${1%/})"
 			  
 			  if [ -f "$LOGGLY_FILE_TO_MONITOR" ];then
 				
