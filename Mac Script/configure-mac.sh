@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-mac.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.2
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -87,7 +87,9 @@ SUPPRESS_PROMPT="false"
 PROP_FILE=
 
 #manual instructions to be show in case of error
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/send-mac-logs-to-loggly/."
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Loggly on Mac are available at https://www.loggly.com/docs/send-mac-logs-to-loggly/."
+
+MANUAL_XCODE_INSTALL_INSTRUCTION="Xcode command line tools are not installed on your system. Try running \"xcode-select --install\" to install xcode command line tools and run script again. You can download tools manually from https://developer.apple.com/"
 
 checkMacLogglyCompatibility()
 {	
@@ -115,7 +117,10 @@ checkMacLogglyCompatibility()
 	#check if minimum version of ruby is installed
 	checkIfMinRubyVersionInstalled
 	
-        MAC_ENV_VALIDATED="true"
+    #check if xcode command line tools are installed
+    checkIfXCodeCommandlineToolsInstalled
+
+    MAC_ENV_VALIDATED="true"
 }
 
 # executing the script for loggly to install and configure fluentd.
@@ -248,7 +253,7 @@ checkIfValidUserNamePassword()
 	echo "INFO: Checking if provided username and password is correct."
 	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
-		logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password."
+		logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password. Your username is visible at the top right of the Loggly console before the @ symbol. You can reset your password at http://<subdomain>.loggly.com/login."
 		exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
@@ -301,6 +306,18 @@ checkIfMinRubyVersionInstalled()
     if [ $(compareVersions $RUBY_VERSION $MIN_RUBY_VERSION 3) -lt 0 ]; then
         logMsgToConfigSysLog "ERROR" "ERROR: Min ruby version required is 1.9.3."
         exit 1
+    fi
+}
+
+checkIfXCodeCommandlineToolsInstalled()
+{
+    logMsgToConfigSysLog "INFO" "INFO: Checking if Xcode command line tools are installed."
+    
+    if [ $(xcode-select -p 2>/dev/null | wc -l ) == 0 ]; then
+        logMsgToConfigSysLog "ERROR" "ERROR: $MANUAL_XCODE_INSTALL_INSTRUCTION"
+        exit 1
+    else
+        logMsgToConfigSysLog "INFO" "INFO: Xcode command line tools are installed in your system."
     fi
 }
 
@@ -455,7 +472,10 @@ startFluentdService()
 #check if the logs made it to Loggly
 checkIfLogsMadeToLoggly()
 {
-	logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly."
+    logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly. Waiting for 30 secs."
+    
+    #sleeping for 30 secs so that fluentd service can start doing its work properly
+    sleep 30
 	uuid=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)	
 
 	queryParam="tag%3AMac%20$uuid"
