@@ -117,10 +117,10 @@ checkMacLogglyCompatibility()
 	#check if minimum version of ruby is installed
 	checkIfMinRubyVersionInstalled
 	
-    #check if xcode command line tools are installed
-    checkIfXCodeCommandlineToolsInstalled
+     	#check if xcode command line tools are installed
+    	checkIfXCodeCommandlineToolsInstalled
 
-    MAC_ENV_VALIDATED="true"
+    	MAC_ENV_VALIDATED="true"
 }
 
 # executing the script for loggly to install and configure fluentd.
@@ -196,9 +196,9 @@ checkIfUserHasRootPrivileges()
 #check if supported operating system
 checkIfSupportedOS()
 {
-    # Determine OS platform
-    UNAME=$(uname | tr "[:upper:]" "[:lower:]")
-    MAC_DIST=$UNAME
+    	# Determine OS platform
+    	UNAME=$(uname | tr "[:upper:]" "[:lower:]")
+    	MAC_DIST=$UNAME
 	if [ "$MAC_DIST" == "darwin" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Operating system is Mac"
 	else
@@ -350,8 +350,8 @@ installFluentd()
 #this function installs Loggly fluentd plugin
 installLogglyFluentdPlugin()
 {
-    logMsgToConfigSysLog "INFO" "INFO: Installing Loggly plugin for Fluentd"
-    sudo gem install fluent-plugin-loggly
+    	logMsgToConfigSysLog "INFO" "INFO: Installing Loggly plugin for Fluentd"
+    	sudo gem install fluent-plugin-loggly
 	logMsgToConfigSysLog "INFO" "INFO: Loggly fluentd plugin installed successfully."
 }
 
@@ -432,7 +432,7 @@ configureFluentdAsService()
 	fi
 	
 	sudo touch $PROP_FILE
-    sudo chmod +x $PROP_FILE
+    	sudo chmod +x $PROP_FILE
 
 propStr="
 <?xml version="1.0" encoding="UTF-8"?>
@@ -472,10 +472,10 @@ startFluentdService()
 #check if the logs made it to Loggly
 checkIfLogsMadeToLoggly()
 {
-    logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly. Waiting for 30 secs."
+    	logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly. Waiting for 30 secs."
     
-    #sleeping for 30 secs so that fluentd service can start doing its work properly
-    sleep 30
+    	#sleeping for 30 secs so that fluentd service can start doing its work properly
+    	sleep 30
 	uuid=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)	
 
 	queryParam="tag%3AMac%20$uuid"
