@@ -147,10 +147,8 @@ installLogglyConf()
 	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
 
-
 	#write new sha2 certificate
 	createCertificate
-
 
 	if [ "$TEST_MODE" = "true" ]; then
 		
@@ -454,7 +452,7 @@ writeContents()
 #          -------------------------------------------------------
 
 # Define the template used for sending logs to Loggly. Do not change this format.
-\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3 tag=\"RsyslogTLS\"] %msg%\n\"
+\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3 tag=\\\"RsyslogTLS\\\"] %msg%\n\"
 
 # Setup disk assisted queues
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
@@ -561,12 +559,19 @@ createCertificate()
 {
 	DIRECTORY_K="/etc/rsyslog.d/keys";
 	DIRECTORY_CA="/etc/rsyslog.d/keys/ca.d";
-	logMsgToConfigSysLog "INFO" "INFO: Installing gnutls"
-	sudo apt-get update
-	sudo apt-get install rsyslog-gnutls
 	
-	logMsgToConfigSysLog "INFO" "INFO: Making directories /etc/rsyslog.d/keys/ca.d"
+	gnutls_check=$(sudo dpkg --get-selections | grep "rsyslog-gnutls")
+	logMsgToConfigSysLog "INFO" "INFO: Checking for gnutls: $gnutls_check"       	
+	if [ "" == "$gnutls_check" ]; then
+		logMsgToConfigSysLog "INFO" "INFO: rsyslog-gnutls is not installed. Installing now"
+	        sudo apt-get update
+	        sudo apt-get install rsyslog-gnutls
+	else
+		logMsgToConfigSysLog "INFO" "INFO: rsyslog-gnutls already installed"
+	fi
+
 	if [ ! -d "$DIRECTORY_K" ]; then
+		logMsgToConfigSysLog "INFO" "INFO: Creating directory /etc/rsyslog.d/keys/ca.d"
 		sudo mkdir /etc/rsyslog.d/keys
 		sudo mkdir /etc/rsyslog.d/keys/ca.d
 	elif [ -d "$DIRECTORY_K" ]; then
@@ -574,18 +579,18 @@ createCertificate()
 			sudo mkdir /etc/rsyslog.d/keys/ca.d
 		fi
 	fi
+	logMsgToConfigSysLog "INFO" "INFO: /etc/rsyslog.d/keys/ca.d already exists"
 	cd /etc/rsyslog.d/keys/ca.d/
  
 	logMsgToConfigSysLog "INFO" "INFO: Downloading required certificates"
 	sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12
+	#sudo cat logs-01.loggly.com_sha12 > loggly_full.crt
 
 }
 
 #Updates the /etc/hosts file with test collectorIP and creates backup of file
 updateHostsFile()
 {
-	#logMsgToConfigSysLog "INFO" "INFO: Making backup of /etc/hosts"
-	cp /etc/hosts /etc/hosts.bk
 	sudo sed -i '$ a\'"52.1.106.130 logs-01.loggly.com" /etc/hosts
 	logMsgToConfigSysLog "INFO" "INFO: Hosts file Updated"
 }
@@ -617,6 +622,10 @@ checkIfLogsMadeToLoggly()
 	queryParam="syslog.appName%3ALOGGLYVERIFY%20$uuid"
 	logger -t "LOGGLYVERIFY" "LOGGLYVERIFY-Test message for verification with UUID $uuid"
 
+	
+	#restores hosts file to its earlier state
+	restoreHostFile
+	
 	counter=1
 	maxCounter=10
 	finalCount=0
@@ -637,7 +646,7 @@ checkIfLogsMadeToLoggly()
 		searchAndFetch finalCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			restoreHostFile
+
 			logMsgToConfigSysLog "ERROR" "ERROR: Logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
@@ -645,11 +654,10 @@ checkIfLogsMadeToLoggly()
 
 	if [ "$finalCount" -eq 1 ]; then
 		if [ "$IS_INVOKED" = "" ]; then
-			restoreHostFile
+
 			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly."
 	 		exit 0
 		else
-			restoreHostFile
 			logMsgToConfigSysLog "INFO" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly."
  		fi
 	fi
@@ -659,7 +667,6 @@ checkIfLogsMadeToLoggly()
 #restores host file to its original state
 restoreHostFile()
 {
-	logMsgToConfigSysLog "INFO" "INFO: Restoring Hosts file"
 	if grep -q '52.1.106.130 logs-01.loggly.com' "/etc/hosts";then
         	sed -i -e '/52.1.106.130 logs-01.loggly.com/d' /etc/hosts
 	fi
