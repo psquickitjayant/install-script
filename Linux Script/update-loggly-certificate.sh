@@ -6,7 +6,7 @@
 ##########  Variable Declarations - Start  ##########
 
 #name of the current script. This will get overwritten by the child script which calls this
-SCRIPT_NAME=configure-rsyslog-tls.sh
+SCRIPT_NAME=update-loggly-certificate.sh
 #version of the current script. This will get overwritten by the child script which calls this
 SCRIPT_VERSION=1.0
 
@@ -148,7 +148,7 @@ installLogglyConf()
 	createRsyslogDir
 
 	#write new sha2 certificate
-	createCertificate
+	updateCertificate
 
 	if [ "$TEST_MODE" = "true" ]; then
 		
@@ -167,10 +167,10 @@ installLogglyConf()
 }
 
 #remove loggly configuration from Linux system
-removeLogglyConf()
+revertTLSchanges()
 {
 	#log message indicating starting of Loggly configuration
-	logMsgToConfigSysLog "INFO" "INFO: Initiating uninstall Loggly for Linux."
+	logMsgToConfigSysLog "INFO" "INFO: Initiating restore of rsyslog-tls"
 
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
@@ -182,13 +182,13 @@ removeLogglyConf()
 	setLinuxVariables
 
 	#remove 22-loggly.conf file
-	remove22LogglyConfFile
+	remove22LogglyTLSChange
 
 	#restart rsyslog service
 	restartRsyslog
 
 	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Uninstalled Loggly configuration from Linux system."
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: TLS Changes have been reverted."
 }
 
 #checks if user has root privileges
@@ -430,7 +430,7 @@ checkIfSelinuxServiceEnforced()
 checkAuthTokenAndWriteContents()
 {
 	if [ "$LOGGLY_AUTH_TOKEN" != "" ]; then
-		writeContents $LOGGLY_ACCOUNT $LOGGLY_AUTH_TOKEN $LOGGLY_DISTRIBUTION_ID $LOGS_01_HOST $LOGGLY_SYSLOG_PORT
+		#writeContents $LOGGLY_ACCOUNT $LOGGLY_AUTH_TOKEN $LOGGLY_DISTRIBUTION_ID $LOGS_01_HOST $LOGGLY_SYSLOG_PORT
 		restartRsyslog
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: Loggly auth token is required to configure rsyslog. Please pass -a <auth token> while running script."
@@ -438,160 +438,49 @@ checkAuthTokenAndWriteContents()
 	fi
 }
 
-#write the contents to 22-loggly.conf file
-writeContents()
-{
-
-	WRITE_SCRIPT_CONTENTS="false"
-	rsyslog_version="$(rsyslogd -v)"
-	r_ver=${rsyslog_version:9:1}
-	if [ $r_ver -le 6 ] ; then 
-		inputStr="
-#          -------------------------------------------------------
-#          Syslog Logging Directives for Loggly ($1.loggly.com)
-#          -------------------------------------------------------
-
-# Define the template used for sending logs to Loggly. Do not change this format.
-\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3 tag=\\\"RsyslogTLS\\\"] %msg%\n\"
-
-# Setup disk assisted queues
-\$WorkDirectory /var/spool/rsyslog # where to place spool files
-\$ActionQueueFileName fwdRule1     # unique name prefix for spool files
-\$ActionQueueMaxDiskSpace 1g       # 1gb space limit (use as much as possible)
-\$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
-\$ActionQueueType LinkedList       # run asynchronously
-\$ActionResumeRetryCount -1        # infinite retries if host is down
-
-#RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12
-\$ActionSendStreamDriver gtls
-\$ActionSendStreamDriverMode 1
-\$ActionSendStreamDriverAuthMode x509/name
-\$ActionSendStreamDriverPermittedPeer *.loggly.com
-*.* @@$4:$5;LogglyFormat
-
-#     -------------------------------------------------------
-"
-	else
-		inputStr="
-#          -------------------------------------------------------
-#          Syslog Logging Directives for Loggly ($1.loggly.com)
-#          -------------------------------------------------------
-
-# Define the template used for sending logs to Loggly. Do not change this format.
-# Setup disk assisted queues
-\$WorkDirectory /var/spool/rsyslog # where to place spool files
-\$ActionQueueFileName fwdRule1     # unique name prefix for spool files
-\$ActionQueueMaxDiskSpace 1g       # 1gb space limit (use as much as possible)
-\$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
-\$ActionQueueType LinkedList       # run asynchronously
-\$ActionResumeRetryCount -1        # infinite retries if host is down
-
-#RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12
-\$ActionSendStreamDriver gtls
-\$ActionSendStreamDriverMode 1
-\$ActionSendStreamDriverAuthMode x509/name
-\$ActionSendStreamDriverPermittedPeer *.loggly.com
-
-template(name=\"LogglyFormat\" type=\"string\"
- string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3 tag=\\\"RsyslogTLS\\\"] %msg%\n\"
-)
-
-# Send messages to Loggly over TCP using the template.
-action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"6514\" template=\"LogglyFormat\")
-
-#     -------------------------------------------------------
-"
-	fi
-	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
-		
-		STR_SIZE=${#inputStr}
-		SIZE_FILE=$(stat -c%s "$LOGGLY_RSYSLOG_CONFFILE")
-		
-		#actual file size and variable size with same contents always differ in size with one byte
-		STR_SIZE=$(( STR_SIZE + 1 ))
-		
-		if [ "$STR_SIZE" -ne "$SIZE_FILE" ]; then
-			
-			logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file /etc/rsyslog.d/22-loggly.conf content has changed."
-			if [ "$SUPPRESS_PROMPT" == "false" ]; then
-					while true; 
-					do
-						read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
-						case $yn in
-						[Yy]* )
-							logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-							sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
-							WRITE_SCRIPT_CONTENTS="true"
-							break;;
-						[Nn]* )
-							LINUX_DO_VERIFICATION="false"
-							logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
-							break;;
-						* ) echo "Please answer yes or no.";;
-						esac
-					done
-			else
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
-				WRITE_SCRIPT_CONTENTS="true"
-			fi
-		else
-			 LINUX_DO_VERIFICATION="false"
-		fi
-	else
-		WRITE_SCRIPT_CONTENTS="true"
-	fi
-	
-	if [ "$WRITE_SCRIPT_CONTENTS" == "true" ]; then
-sudo cat << EOIPFW >> $LOGGLY_RSYSLOG_CONFFILE
-$inputStr
-EOIPFW
-	
-	fi
-
-}
-
 #create /etc/rsyslog.d/keys/ca.d directory and installs the certificates
-createCertificate()
+updateCertificate()
 {
+CURRENT_CRT_CONF="$(grep '.crt' $LOGGLY_RSYSLOG_CONFFILE)"
+CURRENT_CRT_COUNT="$(grep '.crt' $LOGGLY_RSYSLOG_CONFFILE | wc -l)"
+if [ $CURRENT_CRT_COUNT -gt 0 ]; then
+
 	DIRECTORY_K="/etc/rsyslog.d/keys";
 	DIRECTORY_CA="/etc/rsyslog.d/keys/ca.d";
 	
-	gnutls_check=$(sudo dpkg --get-selections | grep "rsyslog-gnutls")
-	logMsgToConfigSysLog "INFO" "INFO: Checking for gnutls: $gnutls_check"       	
-	if [ "" == "$gnutls_check" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: rsyslog-gnutls is not installed. Installing now"
-	        sudo apt-get update
-	        sudo apt-get install rsyslog-gnutls
-	else
-		logMsgToConfigSysLog "INFO" "INFO: rsyslog-gnutls already installed"
-	fi
-
 	if [ ! -d "$DIRECTORY_K" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Creating directory /etc/rsyslog.d/keys/ca.d"
+		logMsgToConfigSysLog "INFO" "INFO: Making directories /etc/rsyslog.d/keys/ca.d"
 		sudo mkdir /etc/rsyslog.d/keys
 		sudo mkdir /etc/rsyslog.d/keys/ca.d
 	elif [ -d "$DIRECTORY_K" ]; then
 		if [ ! -d "$DIRECTORY_CA" ]; then
 			sudo mkdir /etc/rsyslog.d/keys/ca.d
 		fi
+	else
+		logMsgToConfigSysLog "INFO" "INFO: Directories /etc/rsyslog.d/keys/ca.d already exists"
 	fi
-	logMsgToConfigSysLog "INFO" "INFO: /etc/rsyslog.d/keys/ca.d already exists"
+	
 	cd /etc/rsyslog.d/keys/ca.d/
- 
 	logMsgToConfigSysLog "INFO" "INFO: Downloading required certificates"
 	sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12
-	#sudo cat logs-01.loggly.com_sha12 > loggly_full.crt
+	sudo cat logs-01.loggly.com_sha12 > loggly_full_sha12.crt
 
+	#taking backup and changing path in 22-loggly.conf
+	sudo cp $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP
+	NEW_CRT_CONF="\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/loggly_full_sha12.crt"
+	sed -i  "s%$CURRENT_CRT_CONF%$NEW_CRT_CONF%g" $LOGGLY_RSYSLOG_CONFFILE
+	logMsgToConfigSysLog "INFO" "INFO: Certificate path changed in 22-loggly.conf"
+else
+	logMsgToConfigSysLog "INFO" "INFO: Rsyslog TLS is not configured."
+	logMsgToConfigSysLog "INFO" "INFO: Please configure Rsyslog TLS first and then retry updating the certificate."
+	exit 1
+fi
 }
 
 #Updates the /etc/hosts file with test collectorIP and creates backup of file
 updateHostsFile()
 {
-	sudo sed -i '$ a\'"52.1.106.130 logs-01.loggly.com" /etc/hosts
+	sudo sed -i '$ a\ '"52.1.106.130 logs-01.loggly.com" /etc/hosts
 	logMsgToConfigSysLog "INFO" "INFO: Hosts file Updated"
 }
 
@@ -674,11 +563,18 @@ restoreHostFile()
 }
 
 #delete 22-loggly.conf file
-remove22LogglyConfFile()
+remove22LogglyTLSChange()
 {
-	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		sudo rm -rf "$LOGGLY_RSYSLOG_CONFFILE"
+CURRENT_CRT_COUNT="$(grep '.crt' $LOGGLY_RSYSLOG_CONFFILE | wc -l)"
+if [ $CURRENT_CRT_COUNT -gt 0 ]; then
+	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
+		sudo rm -rf $LOGGLY_RSYSLOG_CONFFILE
+		sudo cp $LOGGLY_RSYSLOG_CONFFILE_BACKUP $LOGGLY_RSYSLOG_CONFFILE
 	fi
+else
+	logMsgToConfigSysLog "INFO" "INFO: Rsyslog TLS is not configured."
+	exit 1
+fi
 }
 
 #compares two version numbers, used for comparing versions of various softwares
@@ -864,7 +760,7 @@ if [ "$1" != "being-invoked" ]; then
 	fi
 
 	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
-		removeLogglyConf
+		revertTLSchanges
 	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
 			getPassword
@@ -880,4 +776,3 @@ fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
 #        
-
