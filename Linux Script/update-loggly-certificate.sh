@@ -100,18 +100,21 @@ checkLinuxLogglyCompatibility()
 
 	#set the basic variables needed by this script
 	setLinuxVariables
+	
+	if [ "$TEST_MODE" = "true" ]; then
 
-	#check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
-	checkIfLogglyServersAccessible
+		#check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
+		checkIfLogglyServersAccessible
+		
+		#check if user credentials are valid. If no, then exit
+		checkIfValidUserNamePassword
 
-	#check if user credentials are valid. If no, then exit
-	checkIfValidUserNamePassword
-
-	#get authentication token if not provided
-	getAuthToken
-
-	#check if authentication token is valid. If no, then exit.
-	checkIfValidAuthToken
+		#get authentication token if not provided
+		getAuthToken
+	
+		#check if authentication token is valid. If no, then exit.
+		checkIfValidAuthToken
+	fi
 
 	#checking if syslog-ng is configured as a service
 	checkifSyslogNgConfiguredAsService
@@ -141,9 +144,6 @@ installLogglyConf()
 		checkLinuxLogglyCompatibility
 	fi
 
-	#if all the above check passes, write the 22-loggly.conf file
-	checkAuthTokenAndWriteContents
-
 	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
 
@@ -151,6 +151,9 @@ installLogglyConf()
 	updateCertificate
 
 	if [ "$TEST_MODE" = "true" ]; then
+
+		#if all the above check passes, write the 22-loggly.conf file
+		checkAuthTokenAndWriteContents
 		
 		#call changeHostFile to test collector
 		updateHostsFile
@@ -707,8 +710,7 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: configure-rsyslog-tls [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
-usage: configure-rsyslog-tls [-te for test]
+usage: configure-rsyslog-tls [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [-te for test]
 usage: configure-rsyslog-tls [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-rsyslog-tls [-h for help]
 EOF
@@ -717,7 +719,7 @@ EOF
 ##########  Get Inputs from User - Start  ##########
 if [ "$1" != "being-invoked" ]; then
 	if [ $# -eq 0 ]; then
-		usage
+		installLogglyConf
 		exit
 	else
 		while [ "$1" != "" ]; do
@@ -742,7 +744,7 @@ if [ "$1" != "being-invoked" ]; then
 				LOGGLY_PASSWORD=$1
 				;;
 			-r | --remove )
-				LOGGLY_REMOVE="true"
+				TLS_RESET="true"
 				;;
 			-s | --suppress )
 				SUPPRESS_PROMPT="true"
@@ -759,16 +761,16 @@ if [ "$1" != "being-invoked" ]; then
 		done
 	fi
 
-	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
-		revertTLSchanges
-	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
-		if [ "$LOGGLY_PASSWORD" = "" ]; then
-			getPassword
+		if [ "$TLS_RESET" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then 
+			revertTLSchanges
+		elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$TEST_MODE" == "true" ]; then
+			if [ "$LOGGLY_PASSWORD" = "" ]; then
+				getPassword
+			fi
+			installLogglyConf
+		else
+			usage
 		fi
-		installLogglyConf
-	else
-		usage
-	fi
 else
 	IS_INVOKED="true"
 fi
