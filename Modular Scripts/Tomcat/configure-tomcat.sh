@@ -53,9 +53,6 @@ TAG=
 #this is not a mandatory input
 LOGGLY_CATALINA_HOME=
 
-#this variable will hold if the access-logs are invoked.
-CONFIGURE_ACCESS_LOGS="false"
-
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable will hold if the check env function for linux is invoked
@@ -465,7 +462,6 @@ updateServerXML()
 
 	if ! grep -q 'renameOnRotate="true"' "$LOGGLY_CATALINA_HOME/conf/server.xml";
 	then
-		CONFIGURE_ACCESS_LOGS="true"
 		
 		#Creating backup of server.xml to server.xml.bk
 	        logMsgToConfigSysLog "INFO" "INFO: Creating backup of server.xml to server.xml.bk"
@@ -601,12 +597,6 @@ write21TomcatFileContents()
 	\$InputRunFileMonitor
 	if \$programname == 'manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
 	if \$programname == 'manager' then ~
-	"
-	fi
-
-	if [ $CONFIGURE_ACCESS_LOGS == "true" ];
-	then
-	imfileStr+="
 
 	# localhost_access_log.txt 
 	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost_access_log.txt
@@ -619,7 +609,6 @@ write21TomcatFileContents()
 	if \$programname == 'tomcat-access' then ~
 	"
 	fi
-	
 
 	#change the tomcat-21 file to variable from above and also take the directory of the tomcat log file.
 sudo cat << EOIPFW >> $TOMCAT_SYSLOG_CONFFILE
