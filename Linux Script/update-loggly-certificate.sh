@@ -465,8 +465,8 @@ if [ $CURRENT_CRT_COUNT -gt 0 ]; then
 	
 	cd /etc/rsyslog.d/keys/ca.d/
 	logMsgToConfigSysLog "INFO" "INFO: Downloading required certificates"
-	sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
-	sudo cat logs-01.loggly.com_sha12.crt > loggly_full_sha12.crt
+	sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12
+	sudo cat logs-01.loggly.com_sha12 > loggly_full_sha12.crt
 
 	#taking backup and changing path in 22-loggly.conf
 	sudo cp $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP
@@ -710,9 +710,9 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: configure-rsyslog-tls [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [-te for test]
-usage: configure-rsyslog-tls [-a loggly auth account or subdomain] [-r to remove]
-usage: configure-rsyslog-tls [-h for help]
+usage: update-loggly-certificate [-a loggly auth account or subdomain] [-u username] [-t loggly token (optional)] [-p password (optional)] [-te for test] [-s suppress prompts {optional)]
+usage: update-loggly-certificate [-a loggly auth account or subdomain] [-r to remove]
+usage: update-loggly-certificate [-h for help]
 EOF
 }
 
@@ -778,3 +778,4 @@ fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
 #        
+u
