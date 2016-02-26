@@ -39,7 +39,7 @@ HOST_NAME=
 LINUX_DIST=
 
 #this variable will hold if the script is for test
-TEST_MODE="false"
+TEST_MODE="true"
 
 #host name for logs-01.loggly.com
 LOGS_01_HOST=logs-01.loggly.com
@@ -465,7 +465,7 @@ if [ $CURRENT_CRT_COUNT -gt 0 ]; then
 	
 	cd /etc/rsyslog.d/keys/ca.d/
 	logMsgToConfigSysLog "INFO" "INFO: Downloading required certificates"
-	sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12
+	sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
 	sudo cat logs-01.loggly.com_sha12 > loggly_full_sha12.crt
 
 	#taking backup and changing path in 22-loggly.conf
@@ -710,7 +710,7 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: update-loggly-certificate [-a loggly auth account or subdomain] [-u username] [-t loggly token (optional)] [-p password (optional)] [-te for test] [-s suppress prompts {optional)]
+usage: update-loggly-certificate [-a loggly auth account or subdomain] [-u username] [-t loggly token (optional)] [-p password (optional)] [ -notest to disable test mode (optional)] [-s suppress prompts {optional)]
 usage: update-loggly-certificate [-a loggly auth account or subdomain] [-r to remove]
 usage: update-loggly-certificate [-h for help]
 EOF
@@ -719,7 +719,7 @@ EOF
 ##########  Get Inputs from User - Start  ##########
 if [ "$1" != "being-invoked" ]; then
 	if [ $# -eq 0 ]; then
-		installLogglyConf
+		usage
 		exit
 	else
 		while [ "$1" != "" ]; do
@@ -732,9 +732,9 @@ if [ "$1" != "being-invoked" ]; then
 				LOGGLY_ACCOUNT=$1
 				echo "Loggly account or subdomain: $LOGGLY_ACCOUNT"
 				;;
-			-te | --test ) shift
-				TEST_MODE="true"
-				echo "Test mode is active"
+			-notest | --notest ) shift
+				TEST_MODE="false"
+				echo "Test mode disabled"
 				;;
 			-u | --username ) shift
 				LOGGLY_USERNAME=$1
@@ -763,7 +763,12 @@ if [ "$1" != "being-invoked" ]; then
 
 		if [ "$TLS_RESET" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then 
 			revertTLSchanges
-		elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$TEST_MODE" == "true" ]; then
+		elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+			if [ "$LOGGLY_PASSWORD" = "" ]; then
+				getPassword
+			fi
+			installLogglyConf
+		elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$TEST_MODE" == "false" ]; then
 			if [ "$LOGGLY_PASSWORD" = "" ]; then
 				getPassword
 			fi
@@ -778,4 +783,3 @@ fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
 #        
-u
