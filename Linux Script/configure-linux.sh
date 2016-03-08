@@ -130,6 +130,9 @@ checkLinuxLogglyCompatibility()
 
 	#check if selinux service is enforced. if yes, ask the user to manually disable and exit the script
 	checkIfSelinuxServiceEnforced
+	
+	#update rsyslog.conf and adds $MaxMessageSize in it
+	modifyMaxMessageSize
 
 	LINUX_ENV_VALIDATED="true"
 }
@@ -419,6 +422,17 @@ checkIfSelinuxServiceEnforced()
 		logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please disable it and start the rsyslog daemon manually."
 		exit 1
 	fi
+}
+
+#update rsyslog.conf and adds $MaxMessageSize in it
+modifyMaxMessageSize()
+{
+	if  grep -q '$MaxMessageSize' "/etc/rsyslog.conf"; then
+		sed -i 's/.*$MaxMessageSize.*/$MaxMessageSize 64k/g' /etc/rsyslog.conf
+	else
+	sed -i '1 a $MaxMessageSize 64k' /etc/rsyslog.conf
+	fi
+	logMsgToConfigSysLog "INFO" "INFO : Modified \$MaxMessageSize to 64k in rsyslog.conf"
 }
 
 #check if authentication token is valid and then write contents to 22-loggly.conf file to /etc/rsyslog.d directory
