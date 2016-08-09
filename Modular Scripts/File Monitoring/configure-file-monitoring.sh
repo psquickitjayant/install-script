@@ -6,7 +6,7 @@ curl -s -o configure-linux.sh https://www.loggly.com/install/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
-#name of the current script
+	#name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
 SCRIPT_VERSION=1.13
@@ -439,7 +439,7 @@ write21ConfFileContents()
 		\$InputRunFileMonitor
 		#Add a tag for file events
 		template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
-		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"514\" template=\"$CONF_FILE_FORMAT_NAME\")
+		action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"6514\" template=\"LogglyFormat\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
 		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
 		"
 	fi
