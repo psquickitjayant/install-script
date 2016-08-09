@@ -181,7 +181,7 @@ configureDirectoryFileMonitoring()
 			esac
 		done
 		while true; do
-			read -p "Would you like install a Cron job to sync the files currently in your Directory every 5 minutes? (yes/no)" yn
+			read -p "Would you like install a Cron job to sync the files currently in your Directory every 10 minutes? (yes/no)" yn
 			case $yn in
 				[Yy]* )
 					doCronInstallation
@@ -366,7 +366,7 @@ sudo touch $CRON_SCRIPT
 sudo chmod +x $CRON_SCRIPT
 
 cronScriptStr="#!/bin/bash
-curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
+curl -s -o configure-file-monitoring.sh https://raw.githubusercontent.com/psquickitjayant/install-script/file-monitoring-with-tls-8x/Modular%20Scripts/File%20Monitoring/configure-file-monitoring.sh
 sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE.bk
 sudo rm -f $FILE_SYSLOG_CONFFILE
 sudo bash configure-file-monitoring.sh -a $LOGGLY_ACCOUNT -u $LOGGLY_USERNAME -p $LOGGLY_PASSWORD -f $LOGGLY_FILE_TO_MONITOR -l $FILE_ALIAS -tag $LOGGLY_FILE_TAG -s
