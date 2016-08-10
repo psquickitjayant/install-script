@@ -437,10 +437,13 @@ write21ConfFileContents()
 		\$InputFileSeverity info
 		\$InputFilePersistStateInterval 20000
 		\$InputRunFileMonitor
+		\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
 		#Add a tag for file events
 		template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
-		action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"6514\" template=\"LogglyFormat\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
-		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
+		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then {
+			action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"6514\" template=\"$CONF_FILE_FORMAT_NAME\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
+		}
+		#if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
 		"
 	fi
 	#write to 21-<file-alias>.conf file
